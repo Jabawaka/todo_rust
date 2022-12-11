@@ -41,13 +41,43 @@ struct Task {
     created_on: DateTime<Utc>,
 }
 
+impl Task {
+    fn get_time_str(&self) -> String {
+        let mut time_str = String::from("");
+
+        if self.elapsed_time.as_secs() < 60 {
+            time_str.push_str("< 1 min");
+        } else {
+            let hours: u64 = (self.elapsed_time.as_secs() as f64 / 3600.0).floor() as u64;
+            let mins: u64 = ((self.elapsed_time.as_secs() - hours * 3600) as f64 / 60.0).round() as u64;
+            if hours > 0 {
+                time_str.push_str(&hours.to_string());
+                time_str.push_str(" h");
+            }
+            time_str.push_str(" ");
+            time_str.push_str(&mins.to_string());
+            time_str.push_str(" min");
+        }
+
+        time_str
+    }
+
+    fn toggle_active(&mut self, elapsed_time: Duration) {
+        if self.is_active {
+            self.elapsed_time += elapsed_time;
+            self.is_active = false;
+        } else {
+            self.is_active = true;
+        }
+    }
+}
+
 
 struct App {
     db_path: String,
     last_event: Instant,
     tasks: Vec<Task>,
     state: AppState,
-    selected_task: usize,
 }
 
 impl App {
@@ -56,6 +86,13 @@ impl App {
         let mut parsed_tasks: Vec<Task> = serde_json::from_str(&db_content)?;
 
         if parsed_tasks.len() > 0 {
+            let mut index = 0;
+
+            while index < parsed_tasks.len()
+            {
+                parsed_tasks[index].is_selected = false;
+                index += 1;
+            }
             parsed_tasks[0].is_selected = true;
         }
 
@@ -64,7 +101,6 @@ impl App {
             last_event: Instant::now(),
             tasks: parsed_tasks.to_owned(),
             state: AppState::Display,
-            selected_task: 0,
         })
     }
 
@@ -96,19 +132,15 @@ impl App {
     }
 
     fn activate_task(&mut self) {
-        let mut index = 0;
         let now = Instant::now();
+        let mut index = 0;
         while index < self.tasks.len() {
             // For the current active task do the ellapsed time and reset it
             if self.tasks[index].is_active {
-                let elapsed = self.last_event.elapsed();
+                self.tasks[index].toggle_active(self.last_event.elapsed());
                 self.last_event = now;
-                self.tasks[index].elapsed_time += elapsed;
-                self.tasks[index].is_active = false;
-            }
-
-            if self.tasks[index].is_selected && !self.tasks[index].is_done {
-                self.tasks[index].is_active = true;
+            } else if self.tasks[index].is_selected && !self.tasks[index].is_done {
+                self.tasks[index].toggle_active(self.last_event.elapsed());
                 self.last_event = now;
             }
 
@@ -119,12 +151,15 @@ impl App {
     }
 
     fn do_undo_task(&mut self) {
+        let now = Instant::now();
         let mut index = 0;
         while index < self.tasks.len() {
             if self.tasks[index].is_selected {
                 self.tasks[index].is_done = !self.tasks[index].is_done;
+
                 if self.tasks[index].is_done {
-                    self.tasks[index].is_active = false;
+                    self.tasks[index].toggle_active(self.last_event.elapsed());
+                    self.last_event = now;
                 }
             }
             index += 1;
@@ -180,7 +215,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         path_to_db = in_args[1].clone();
     }
 
-    let mut app = App::new(&path_to_db)?;
+    let app = App::new(&path_to_db)?;
 
     // ---- RUN APP ----
     let res = run_app(&mut terminal, app);
@@ -211,6 +246,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
             match key.code {
                 KeyCode::Char('q') => {app.save_to_db(); return Ok(())},
                 KeyCode::Esc => return Ok(()),
+                KeyCode::Char('j') => app.inc_sel_task(),
+                KeyCode::Char('k') => app.dec_sel_task(),
                 KeyCode::Down => app.inc_sel_task(),
                 KeyCode::Up => app.dec_sel_task(),
                 KeyCode::Enter => app.activate_task(),
@@ -246,11 +283,13 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
                 disp_string.push_str("[ ] ");
             }
             disp_string.push_str(&task.title);
+            disp_string.push_str(" - ");
+            disp_string.push_str(&task.get_time_str());
 
 
             let mut fg_color = Color::Gray;
             if task.is_selected {
-                fg_color = Color::Black;
+                fg_color = Color::Yellow;
             }
             if task.is_active {
                 fg_color = Color::Green;
@@ -274,7 +313,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
             Block::default()
             .borders(Borders::ALL)
             .style(Style::default())
-            .title(" To do ")
+            .title(" To Do ")
         );
 
     let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task | enter - Mark task as active")
