@@ -37,12 +37,14 @@ struct Task {
     is_done: bool,
     is_active: bool,
     is_selected: bool,
-    ellapsed_time: Duration,
+    elapsed_time: Duration,
     created_on: DateTime<Utc>,
 }
 
 
 struct App {
+    db_path: String,
+    last_event: Instant,
     tasks: Vec<Task>,
     state: AppState,
     selected_task: usize,
@@ -58,6 +60,8 @@ impl App {
         }
 
         Ok(App {
+            db_path: path_to_db.clone(),
+            last_event: Instant::now(),
             tasks: parsed_tasks.to_owned(),
             state: AppState::Display,
             selected_task: 0,
@@ -71,6 +75,7 @@ impl App {
             if self.tasks[index].is_selected {
                 self.tasks[index].is_selected = false;
                 self.tasks[index + 1].is_selected = true;
+                break;
             }
 
             index += 1;
@@ -92,10 +97,55 @@ impl App {
 
     fn activate_task(&mut self) {
         let mut index = 0;
+        let now = Instant::now();
         while index < self.tasks.len() {
-            self.tasks[index].is_active = self.tasks[index].is_selected;
+            // For the current active task do the ellapsed time and reset it
+            if self.tasks[index].is_active {
+                let elapsed = self.last_event.elapsed();
+                self.last_event = now;
+                self.tasks[index].elapsed_time += elapsed;
+                self.tasks[index].is_active = false;
+            }
+
+            if self.tasks[index].is_selected && !self.tasks[index].is_done {
+                self.tasks[index].is_active = true;
+                self.last_event = now;
+            }
+
             index += 1;
         }
+
+        // Store last change of active task
+    }
+
+    fn do_undo_task(&mut self) {
+        let mut index = 0;
+        while index < self.tasks.len() {
+            if self.tasks[index].is_selected {
+                self.tasks[index].is_done = !self.tasks[index].is_done;
+                if self.tasks[index].is_done {
+                    self.tasks[index].is_active = false;
+                }
+            }
+            index += 1;
+        }
+    }
+
+    fn add_test_task(&mut self) {
+        let task = Task {
+            title: String::from("test"),
+            description: String::from("This is a test"),
+            is_done: false,
+            is_active: false,
+            is_selected: false,
+            elapsed_time: Duration::new(5, 0),
+            created_on: Utc::now(),
+        };
+        self.tasks.push(task.clone());
+    }
+
+    fn save_to_db(&mut self) {
+        fs::write(&self.db_path, &serde_json::to_vec_pretty(&self.tasks).expect("DB should be writeable")).expect("DB should be writeable");
     }
 }
 
@@ -159,10 +209,13 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
 
         if let Event::Key(key) = event::read().expect("Could not read events!") {
             match key.code {
-                KeyCode::Char('q') => return Ok(()),
+                KeyCode::Char('q') => {app.save_to_db(); return Ok(())},
+                KeyCode::Esc => return Ok(()),
                 KeyCode::Down => app.inc_sel_task(),
                 KeyCode::Up => app.dec_sel_task(),
                 KeyCode::Enter => app.activate_task(),
+                KeyCode::Char(' ') => app.do_undo_task(),
+                KeyCode::Char('a') => {app.add_test_task(); app.save_to_db()},
                 _ => {}
             }
         }
@@ -224,7 +277,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
             .title(" To do ")
         );
 
-    let instructions = Paragraph::new("Space - Mark task as done | A - Add task")
+    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task | enter - Mark task as active")
         .style(Style::default())
         .alignment(Alignment::Center)
         .block(
