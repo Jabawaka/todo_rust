@@ -6,11 +6,11 @@ use chrono::prelude::*;
 
 use tui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Spans, Span},
     widgets::{
-        Block, BorderType, Borders, Cell, List, ListItem, ListState, Paragraph, Row, Table, Tabs,
+        Block, BorderType, Borders, Paragraph, Wrap,
     },
     Frame, Terminal,
 };
@@ -146,8 +146,6 @@ impl App {
 
             index += 1;
         }
-
-        // Store last change of active task
     }
 
     fn do_undo_task(&mut self) {
@@ -164,6 +162,33 @@ impl App {
             }
             index += 1;
         }
+    }
+
+    fn get_sel_task_info(&self) -> Option<Spans> {
+        let mut index = 0;
+        while index < self.tasks.len() {
+            if self.tasks[index].is_selected {
+                return Some(Spans::from(vec![
+                    Span::raw(&self.tasks[index].description)
+                ]));
+            }
+            index += 1;
+        }
+
+        None
+    }
+
+    fn get_sel_task_title(&self) -> Option<String> {
+        let mut index = 0;
+        while index < self.tasks.len() {
+            if self.tasks[index].is_selected {
+                return Some(self.tasks[index].title.clone());
+            }
+
+            index += 1;
+        }
+
+        None
     }
 
     fn add_test_task(&mut self) {
@@ -265,13 +290,23 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(1)
+        .margin(2)
         .constraints(
             [
                 Constraint::Min(2),
                 Constraint::Length(3),
             ].as_ref(),
         ).split(size);
+
+    let vsplit_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage(25),
+                Constraint::Percentage(15),
+                Constraint::Percentage(60),
+            ]
+        ).split(chunks[0]);
 
     let tasks: Vec<_> = app.tasks
         .iter()
@@ -283,9 +318,6 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
                 disp_string.push_str("[ ] ");
             }
             disp_string.push_str(&task.title);
-            disp_string.push_str(" - ");
-            disp_string.push_str(&task.get_time_str());
-
 
             let mut fg_color = Color::Gray;
             if task.is_selected {
@@ -307,14 +339,55 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         })
         .collect();
 
+    let tasks_duration: Vec<_> = app.tasks
+        .iter()
+        .map(|task| {
+            let mut fg_color = Color::Gray;
+            if task.is_selected {
+                fg_color = Color::Yellow;
+            }
+            if task.is_active {
+                fg_color = Color::Green;
+            }
+
+            let mut style = Style::default().fg(fg_color);
+            if task.is_selected {
+                style = Style::default()
+                    .bg(Color::Gray)
+                    .fg(fg_color)
+                    .add_modifier(Modifier::BOLD);
+            }
+
+            Spans::from(vec![Span::styled(task.get_time_str(), style)])
+        })
+        .collect();
+
     let task_block = Paragraph::new(tasks)
+        .alignment(Alignment::Left)
+        .block(
+            Block::default()
+            .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
+            .style(Style::default())
+            .title(" To Do ")
+        );
+
+    let task_dur_block = Paragraph::new(tasks_duration)
+        .alignment(Alignment::Right)
+        .block(
+            Block::default()
+            .borders(Borders::RIGHT | Borders::TOP | Borders::BOTTOM)
+            .style(Style::default())
+        );
+
+    let task_description = Paragraph::new(app.get_sel_task_info().unwrap_or_else(|| { Spans::from(vec![Span::raw("")]) }))
         .alignment(Alignment::Left)
         .block(
             Block::default()
             .borders(Borders::ALL)
             .style(Style::default())
-            .title(" To Do ")
-        );
+            .title(app.get_sel_task_title().unwrap_or_else(|| { String::from("") }))
+        )
+        .wrap(Wrap { trim: false });
 
     let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task | enter - Mark task as active")
         .style(Style::default())
@@ -326,6 +399,8 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
                 .border_type(BorderType::Double)
         );
 
-    f.render_widget(task_block, chunks[0]);
+    f.render_widget(task_block, vsplit_layout[0]);
+    f.render_widget(task_dur_block, vsplit_layout[1]);
+    f.render_widget(task_description, vsplit_layout[2]);
     f.render_widget(instructions, chunks[1]);
 }

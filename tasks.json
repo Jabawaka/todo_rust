@@ -1,10 +1,10 @@
 [
   {
     "title": "test",
-    "description": "This is a test",
+    "description": "This is a photgraph, a window to the past. Therefore we should send an email to them to let them know",
     "is_done": false,
     "is_active": false,
-    "is_selected": false,
+    "is_selected": true,
     "elapsed_time": {
       "secs": 500,
       "nanos": 0
@@ -26,9 +26,9 @@
   {
     "title": "test",
     "description": "This is a test",
-    "is_done": true,
+    "is_done": false,
     "is_active": false,
-    "is_selected": true,
+    "is_selected": false,
     "elapsed_time": {
       "secs": 97,
       "nanos": 529703200
