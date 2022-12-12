@@ -78,6 +78,7 @@ struct App {
     last_event: Instant,
     tasks: Vec<Task>,
     state: AppState,
+    edit_string: String,
 }
 
 impl App {
@@ -101,7 +102,34 @@ impl App {
             last_event: Instant::now(),
             tasks: parsed_tasks.to_owned(),
             state: AppState::Display,
+            edit_string: String::from(""),
         })
+    }
+
+    fn enter_edit(&mut self) {
+        let mut index = 0;
+        while index < self.tasks.len() {
+            if self.tasks[index].is_selected {
+                self.edit_string = self.tasks[index].description.clone();
+                self.state = AppState::EditTask;
+                break;
+            }
+
+            index += 1;
+        }
+    }
+
+    fn enter_display(&mut self) {
+        let mut index = 0;
+        while index < self.tasks.len() {
+            if self.tasks[index].is_selected {
+                self.tasks[index].description = self.edit_string.clone();
+                self.state = AppState::Display;
+                break;
+            }
+
+            index += 1;
+        }
     }
 
     fn inc_sel_task(&mut self) {
@@ -191,6 +219,14 @@ impl App {
         None
     }
 
+    fn delete_in_field(&mut self) {
+        self.edit_string.pop();
+    }
+
+    fn type_in_field(&mut self, c: char) {
+        self.edit_string.push(c);
+    }
+
     fn add_test_task(&mut self) {
         let task = Task {
             title: String::from("test"),
@@ -268,17 +304,30 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
         terminal.draw(|f| ui(f, &app))?;
 
         if let Event::Key(key) = event::read().expect("Could not read events!") {
-            match key.code {
-                KeyCode::Char('q') => {app.save_to_db(); return Ok(())},
-                KeyCode::Esc => return Ok(()),
-                KeyCode::Char('j') => app.inc_sel_task(),
-                KeyCode::Char('k') => app.dec_sel_task(),
-                KeyCode::Down => app.inc_sel_task(),
-                KeyCode::Up => app.dec_sel_task(),
-                KeyCode::Enter => app.activate_task(),
-                KeyCode::Char(' ') => app.do_undo_task(),
-                KeyCode::Char('a') => {app.add_test_task(); app.save_to_db()},
-                _ => {}
+            match app.state {
+                AppState::Display => {
+                    match key.code {
+                        KeyCode::Char('q') => {app.save_to_db(); return Ok(())},
+                        KeyCode::Esc => return Ok(()),
+                        KeyCode::Char('j') => app.inc_sel_task(),
+                        KeyCode::Char('k') => app.dec_sel_task(),
+                        KeyCode::Down => app.inc_sel_task(),
+                        KeyCode::Up => app.dec_sel_task(),
+                        KeyCode::Enter => app.activate_task(),
+                        KeyCode::Char(' ') => app.do_undo_task(),
+                        KeyCode::Char('a') => {app.add_test_task(); app.save_to_db()},
+                        KeyCode::Char('e') => app.enter_edit(),
+                        _ => {}
+                    }
+                },
+                AppState::EditTask => {
+                    match key.code {
+                        KeyCode::Esc => app.enter_display(),
+                        KeyCode::Backspace => app.delete_in_field(),
+                        KeyCode::Char(c) => app.type_in_field(c),
+                        _ => {}
+                    }
+                },
             }
         }
     }
