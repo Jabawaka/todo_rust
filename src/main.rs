@@ -111,6 +111,7 @@ impl App {
         while index < self.tasks.len() {
             if self.tasks[index].is_selected {
                 self.edit_string = self.tasks[index].description.clone();
+                self.edit_string.push('_');
                 self.state = AppState::EditTask;
                 break;
             }
@@ -123,6 +124,7 @@ impl App {
         let mut index = 0;
         while index < self.tasks.len() {
             if self.tasks[index].is_selected {
+                self.edit_string.pop();
                 self.tasks[index].description = self.edit_string.clone();
                 self.state = AppState::Display;
                 break;
@@ -197,7 +199,10 @@ impl App {
         while index < self.tasks.len() {
             if self.tasks[index].is_selected {
                 return Some(Spans::from(vec![
-                    Span::raw(&self.tasks[index].description)
+                        Span::raw(match self.state {
+                            AppState::Display => &self.tasks[index].description,
+                            AppState::EditTask => &self.edit_string,
+                        })
                 ]));
             }
             index += 1;
@@ -221,10 +226,14 @@ impl App {
 
     fn delete_in_field(&mut self) {
         self.edit_string.pop();
+        self.edit_string.pop();
+        self.edit_string.push('_');
     }
 
     fn type_in_field(&mut self, c: char) {
+        self.edit_string.pop();
         self.edit_string.push(c);
+        self.edit_string.push('_');
     }
 
     fn add_test_task(&mut self) {
@@ -324,6 +333,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                     match key.code {
                         KeyCode::Esc => app.enter_display(),
                         KeyCode::Backspace => app.delete_in_field(),
+                        KeyCode::Enter => app.type_in_field('\n'),
                         KeyCode::Char(c) => app.type_in_field(c),
                         _ => {}
                     }
@@ -351,9 +361,9 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Percentage(25),
-                Constraint::Percentage(15),
-                Constraint::Percentage(60),
+                Constraint::Percentage(30),
+                Constraint::Percentage(20),
+                Constraint::Percentage(50),
             ]
         ).split(chunks[0]);
 
