@@ -103,14 +103,11 @@ impl App {
         let db_content = fs::read_to_string(path_to_db)?;
         let mut parsed_tasks: Vec<Task> = serde_json::from_str(&db_content)?;
 
-        if parsed_tasks.len() > 0 {
-            let mut index = 0;
+        for task in &mut parsed_tasks {
+            task.is_selected = false;
+        }
 
-            while index < parsed_tasks.len()
-            {
-                parsed_tasks[index].is_selected = false;
-                index += 1;
-            }
+        if parsed_tasks.len() > 0 {
             parsed_tasks[0].is_selected = true;
         }
 
@@ -124,30 +121,24 @@ impl App {
     }
 
     fn enter_edit(&mut self) {
-        let mut index = 0;
-        while index < self.tasks.len() {
-            if self.tasks[index].is_selected {
-                self.edit_string = self.tasks[index].description.clone();
+        for task in &mut self.tasks {
+            if task.is_selected {
+                self.edit_string = task.description.clone();
                 self.edit_string.push('_');
                 self.state = AppState::EditTask;
                 break;
             }
-
-            index += 1;
         }
     }
 
     fn enter_display(&mut self) {
-        let mut index = 0;
-        while index < self.tasks.len() {
-            if self.tasks[index].is_selected {
+        for task in &mut self.tasks {
+            if task.is_selected {
                 self.edit_string.pop();
-                self.tasks[index].description = self.edit_string.clone();
+                task.description = self.edit_string.clone();
                 self.state = AppState::Display;
                 break;
             }
-
-            index += 1;
         }
     }
 
@@ -180,62 +171,60 @@ impl App {
 
     fn activate_task(&mut self) {
         let now = Instant::now();
-        let mut index = 0;
-        while index < self.tasks.len() {
+
+        for task in &mut self.tasks {
             // For the current active task do the ellapsed time and reset it
-            if self.tasks[index].is_active {
-                self.tasks[index].toggle_active(self.last_event.elapsed());
+            if task.is_active {
+                task.toggle_active(self.last_event.elapsed());
                 self.last_event = now;
-            } else if self.tasks[index].is_selected && !self.tasks[index].is_done {
-                self.tasks[index].toggle_active(self.last_event.elapsed());
+            } else if task.is_selected && !task.is_done {
+                task.toggle_active(self.last_event.elapsed());
                 self.last_event = now;
             }
-
-            index += 1;
         }
     }
 
     fn do_undo_task(&mut self) {
         let now = Instant::now();
-        let mut index = 0;
-        while index < self.tasks.len() {
-            if self.tasks[index].is_selected {
-                self.tasks[index].is_done = !self.tasks[index].is_done;
 
-                if self.tasks[index].is_done && self.tasks[index].is_active {
-                    self.tasks[index].toggle_active(self.last_event.elapsed());
+        for task in &mut self.tasks {
+            if task.is_selected {
+                task.is_done = !task.is_done;
+
+                if task.is_done && task.is_active {
+                    task.toggle_active(self.last_event.elapsed());
                     self.last_event = now;
                 }
             }
-            index += 1;
         }
     }
 
-    fn get_sel_task_info(&self) -> Option<Spans> {
-        let mut index = 0;
-        while index < self.tasks.len() {
-            if self.tasks[index].is_selected {
-                return Some(Spans::from(vec![
-                        Span::raw(match self.state {
-                            AppState::Display => &self.tasks[index].description,
-                            AppState::EditTask => &self.edit_string,
-                        })
-                ]));
+    fn get_sel_task_info(&self) -> Option<Vec<Spans>> {
+        for task in &self.tasks {
+            if task.is_selected {
+                let lines: Vec<&str> = match self.state {
+                    AppState::Display => &task.description,
+                    AppState::EditTask => &self.edit_string,
+                }.split("\n").collect();
+
+                let mut spans: Vec<Spans> = vec![];
+
+                for line in lines {
+                    spans.push(Spans::from(vec![Span::raw(line)]));
+                }
+
+                return Some(spans);
             }
-            index += 1;
         }
 
         None
     }
 
     fn get_sel_task_title(&self) -> Option<String> {
-        let mut index = 0;
-        while index < self.tasks.len() {
-            if self.tasks[index].is_selected {
-                return Some(self.tasks[index].title.clone());
+        for task in &self.tasks {
+            if task.is_selected {
+                return Some(task.title.clone());
             }
-
-            index += 1;
         }
 
         None
@@ -325,7 +314,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 // ---- AUXILIARY FUNCTIONS ----
 // Main run app function
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), Box<dyn std::error::Error>> {
     // SET UP EVENT LOOP
     let (tx, rx) = mpsc::channel();
     let tick_rate = Duration::from_millis(200);
@@ -356,45 +345,37 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
 
         match app.state {
             AppState::Display => {
-                if let Ok(event) = rx.recv() {
-                    match event {
-                        Event::Input(key) => {
-                            match key.code {
-                                KeyCode::Char('q') => {app.save_to_db(); return Ok(())},
-                                KeyCode::Esc => return Ok(()),
-                                KeyCode::Char('j') => app.inc_sel_task(),
-                                KeyCode::Char('k') => app.dec_sel_task(),
-                                KeyCode::Down => app.inc_sel_task(),
-                                KeyCode::Up => app.dec_sel_task(),
-                                KeyCode::Enter => app.activate_task(),
-                                KeyCode::Char(' ') => app.do_undo_task(),
-                                KeyCode::Char('a') => {app.add_test_task(); app.save_to_db()},
-                                KeyCode::Char('e') => app.enter_edit(),
-                                _ => {}
-                            }
-                        },
-                        Event::Tick => {},
-                    }
-                } else {
-                    panic!("Something went wrong with the receiver!");
+                match rx.recv()? {
+                    Event::Input(key) => {
+                        match key.code {
+                            KeyCode::Char('q') => {app.save_to_db(); return Ok(())},
+                            KeyCode::Esc => return Ok(()),
+                            KeyCode::Char('j') => app.inc_sel_task(),
+                            KeyCode::Char('k') => app.dec_sel_task(),
+                            KeyCode::Down => app.inc_sel_task(),
+                            KeyCode::Up => app.dec_sel_task(),
+                            KeyCode::Enter => app.activate_task(),
+                            KeyCode::Char(' ') => app.do_undo_task(),
+                            KeyCode::Char('a') => {app.add_test_task(); app.save_to_db()},
+                            KeyCode::Char('e') => app.enter_edit(),
+                            _ => {}
+                        }
+                    },
+                    Event::Tick => {},
                 }
             },
             AppState::EditTask => {
-                if let Ok(event) = rx.recv() {
-                    match event {
-                        Event::Input(key) => {
-                            match key.code {
-                                KeyCode::Esc => app.enter_display(),
-                                KeyCode::Backspace => app.delete_in_field(),
-                                KeyCode::Enter => app.type_in_field('\n'),
-                                KeyCode::Char(c) => app.type_in_field(c),
-                                _ => {}
-                            }
-                        },
-                        Event::Tick => {},
-                    }
-                } else {
-                    panic!("Something went wrong with the receiver!");
+                match rx.recv()? {
+                    Event::Input(key) => {
+                        match key.code {
+                            KeyCode::Esc => app.enter_display(),
+                            KeyCode::Backspace => app.delete_in_field(),
+                            KeyCode::Enter => app.type_in_field('\n'),
+                            KeyCode::Char(c) => app.type_in_field(c),
+                            _ => {}
+                        }
+                    },
+                    Event::Tick => {},
                 }
             },
         }
@@ -496,7 +477,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
             .style(Style::default())
         );
 
-    let task_description = Paragraph::new(app.get_sel_task_info().unwrap_or_else(|| { Spans::from(vec![Span::raw("")]) }))
+    let task_description = Paragraph::new(app.get_sel_task_info().unwrap_or_else(|| { vec![Spans::from(vec![Span::raw("")])] }))
         .alignment(Alignment::Left)
         .block(
             Block::default()

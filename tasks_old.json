@@ -1,10 +1,10 @@
 [
   {
     "title": "test",
-    "description": "This is a photgraph, a window to the past. Therefore we should send an email to them to let them know",
+    "description": "This is a photograph, a window to the past.\nSo let's try to send them a note shall we?",
     "is_done": false,
     "is_active": false,
-    "is_selected": false,
+    "is_selected": true,
     "elapsed_time": {
       "secs": 500,
       "nanos": 0
@@ -13,7 +13,7 @@
   },
   {
     "title": "test",
-    "description": "This is a test of Spanish, éáíóú",
+    "description": "This is the first line.\nThis is the second line.",
     "is_done": false,
     "is_active": false,
     "is_selected": false,
@@ -25,10 +25,10 @@
   },
   {
     "title": "test",
-    "description": "This is a test",
+    "description": "This is a test let's go again",
     "is_done": false,
     "is_active": false,
-    "is_selected": true,
+    "is_selected": false,
     "elapsed_time": {
       "secs": 102,
       "nanos": 717680500
