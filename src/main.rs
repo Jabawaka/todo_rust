@@ -1,6 +1,10 @@
-use std::{error::Error, io, io::Write, env, fs, fs::File};
-use std::time::{Duration, Instant};
 use std::path::Path;
+use std::env;
+use std::{fs, fs::File};
+use std::{io, io::Write};
+use std::sync::mpsc;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use chrono::prelude::*;
 
@@ -16,7 +20,7 @@ use tui::{
 };
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event as CEvent, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -25,6 +29,11 @@ use serde::{Deserialize, Serialize};
 
 
 // ---- STRUCT AND ENUM DEFINITION ----
+enum Event<I> {
+    Input(I),
+    Tick,
+}
+
 enum AppState {
     Display,
     EditTask,
@@ -73,6 +82,14 @@ impl Task {
 }
 
 
+struct EditString<'a> {
+    cursor_pos: usize,
+    string: String,
+    first_part: &'a str,
+    second_part: &'a str,
+}
+
+
 struct App {
     db_path: String,
     last_event: Instant,
@@ -82,7 +99,7 @@ struct App {
 }
 
 impl App {
-    fn new(path_to_db: &String) -> Result<App, Box<dyn Error>> {
+    fn new(path_to_db: &String) -> Result<App, Box<dyn std::error::Error>> {
         let db_content = fs::read_to_string(path_to_db)?;
         let mut parsed_tasks: Vec<Task> = serde_json::from_str(&db_content)?;
 
@@ -185,7 +202,7 @@ impl App {
             if self.tasks[index].is_selected {
                 self.tasks[index].is_done = !self.tasks[index].is_done;
 
-                if self.tasks[index].is_done {
+                if self.tasks[index].is_done && self.tasks[index].is_active {
                     self.tasks[index].toggle_active(self.last_event.elapsed());
                     self.last_event = now;
                 }
@@ -256,7 +273,7 @@ impl App {
 
 
 // ---- MAIN FUNCTION ----
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ---- SET UP TERMINAL ----
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -309,36 +326,77 @@ fn main() -> Result<(), Box<dyn Error>> {
 // ---- AUXILIARY FUNCTIONS ----
 // Main run app function
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+    // SET UP EVENT LOOP
+    let (tx, rx) = mpsc::channel();
+    let tick_rate = Duration::from_millis(200);
+    thread::spawn(move || {
+        let mut last_tick = Instant::now();
+        loop {
+            let timeout = tick_rate
+                .checked_sub(last_tick.elapsed())
+                .unwrap_or_else(|| Duration::from_secs(0));
+
+            if event::poll(timeout).expect("Polling should work!") {
+                if let CEvent::Key(key) = event::read().expect("Should be able to read events!") {
+                    tx.send(Event::Input(key)).expect("Should be able to send events!");
+                }
+            }
+
+            if last_tick.elapsed() >= tick_rate {
+                if let Ok(_) = tx.send(Event::Tick) {
+                    last_tick = Instant::now();
+                }
+            }
+        }
+    });
+
+    // MAIN LOOP
     loop {
         terminal.draw(|f| ui(f, &app))?;
 
-        if let Event::Key(key) = event::read().expect("Could not read events!") {
-            match app.state {
-                AppState::Display => {
-                    match key.code {
-                        KeyCode::Char('q') => {app.save_to_db(); return Ok(())},
-                        KeyCode::Esc => return Ok(()),
-                        KeyCode::Char('j') => app.inc_sel_task(),
-                        KeyCode::Char('k') => app.dec_sel_task(),
-                        KeyCode::Down => app.inc_sel_task(),
-                        KeyCode::Up => app.dec_sel_task(),
-                        KeyCode::Enter => app.activate_task(),
-                        KeyCode::Char(' ') => app.do_undo_task(),
-                        KeyCode::Char('a') => {app.add_test_task(); app.save_to_db()},
-                        KeyCode::Char('e') => app.enter_edit(),
-                        _ => {}
+        match app.state {
+            AppState::Display => {
+                if let Ok(event) = rx.recv() {
+                    match event {
+                        Event::Input(key) => {
+                            match key.code {
+                                KeyCode::Char('q') => {app.save_to_db(); return Ok(())},
+                                KeyCode::Esc => return Ok(()),
+                                KeyCode::Char('j') => app.inc_sel_task(),
+                                KeyCode::Char('k') => app.dec_sel_task(),
+                                KeyCode::Down => app.inc_sel_task(),
+                                KeyCode::Up => app.dec_sel_task(),
+                                KeyCode::Enter => app.activate_task(),
+                                KeyCode::Char(' ') => app.do_undo_task(),
+                                KeyCode::Char('a') => {app.add_test_task(); app.save_to_db()},
+                                KeyCode::Char('e') => app.enter_edit(),
+                                _ => {}
+                            }
+                        },
+                        Event::Tick => {},
                     }
-                },
-                AppState::EditTask => {
-                    match key.code {
-                        KeyCode::Esc => app.enter_display(),
-                        KeyCode::Backspace => app.delete_in_field(),
-                        KeyCode::Enter => app.type_in_field('\n'),
-                        KeyCode::Char(c) => app.type_in_field(c),
-                        _ => {}
+                } else {
+                    panic!("Something went wrong with the receiver!");
+                }
+            },
+            AppState::EditTask => {
+                if let Ok(event) = rx.recv() {
+                    match event {
+                        Event::Input(key) => {
+                            match key.code {
+                                KeyCode::Esc => app.enter_display(),
+                                KeyCode::Backspace => app.delete_in_field(),
+                                KeyCode::Enter => app.type_in_field('\n'),
+                                KeyCode::Char(c) => app.type_in_field(c),
+                                _ => {}
+                            }
+                        },
+                        Event::Tick => {},
                     }
-                },
-            }
+                } else {
+                    panic!("Something went wrong with the receiver!");
+                }
+            },
         }
     }
 }
