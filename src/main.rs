@@ -27,6 +27,9 @@ use crossterm::{
 
 use serde::{Deserialize, Serialize};
 
+// ---- CONSTANTS ----
+const BLINK_TIME: Duration = Duration::from_millis(300);
+
 
 // ---- STRUCT AND ENUM DEFINITION ----
 enum Event<I> {
@@ -82,20 +85,17 @@ impl Task {
 }
 
 
-struct EditString<'a> {
-    cursor_pos: usize,
-    string: String,
-    first_part: &'a str,
-    second_part: &'a str,
-}
-
-
 struct App {
     db_path: String,
     last_event: Instant,
     tasks: Vec<Task>,
     state: AppState,
+
     edit_string: String,
+    cursor_pos: usize,
+    cursor_shown: bool,
+    blink_char: Option<char>,
+    last_blink: Instant,
 }
 
 impl App {
@@ -116,7 +116,12 @@ impl App {
             last_event: Instant::now(),
             tasks: parsed_tasks.to_owned(),
             state: AppState::Display,
+
             edit_string: String::from(""),
+            cursor_pos: 0,
+            cursor_shown: false,
+            blink_char: None,
+            last_blink: Instant::now(),
         })
     }
 
@@ -124,7 +129,10 @@ impl App {
         for task in &mut self.tasks {
             if task.is_selected {
                 self.edit_string = task.description.clone();
-                self.edit_string.push('_');
+                self.edit_string.push(' ');
+                self.last_blink = Instant::now();
+                self.cursor_pos = self.edit_string.chars().count();
+                self.blink_char = None;
                 self.state = AppState::EditTask;
                 break;
             }
@@ -138,6 +146,25 @@ impl App {
                 task.description = self.edit_string.clone();
                 self.state = AppState::Display;
                 break;
+            }
+        }
+    }
+
+    fn update_edit(&mut self) {
+        if self.cursor_pos < self.edit_string.chars().count() {
+        } else {
+            self.blink_char = None;
+
+            if self.last_blink.elapsed() > BLINK_TIME {
+                self.last_blink = Instant::now();
+                self.cursor_shown = !self.cursor_shown;
+
+                self.edit_string.pop();
+                if self.cursor_shown {
+                    self.edit_string.push('_');
+                } else {
+                    self.edit_string.push(' ');
+                }
             }
         }
     }
@@ -234,12 +261,14 @@ impl App {
         self.edit_string.pop();
         self.edit_string.pop();
         self.edit_string.push('_');
+        self.cursor_pos -= 1;
     }
 
     fn type_in_field(&mut self, c: char) {
         self.edit_string.pop();
         self.edit_string.push(c);
         self.edit_string.push('_');
+        self.cursor_pos += 1;
     }
 
     fn add_test_task(&mut self) {
@@ -377,6 +406,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                     },
                     Event::Tick => {},
                 }
+
+                app.update_edit();
             },
         }
     }
@@ -419,7 +450,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
 
             let mut fg_color = Color::Gray;
             if task.is_selected {
-                fg_color = Color::Yellow;
+                fg_color = Color::Black;
             }
             if task.is_active {
                 fg_color = Color::Green;
@@ -442,7 +473,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         .map(|task| {
             let mut fg_color = Color::Gray;
             if task.is_selected {
-                fg_color = Color::Yellow;
+                fg_color = Color::Black;
             }
             if task.is_active {
                 fg_color = Color::Green;
@@ -477,13 +508,17 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
             .style(Style::default())
         );
 
+    let mut task_title = String::from(" ");
+    task_title.push_str(&app.get_sel_task_title().unwrap_or_else(|| { String::from("") }));
+    task_title.push_str(" ");
+
     let task_description = Paragraph::new(app.get_sel_task_info().unwrap_or_else(|| { vec![Spans::from(vec![Span::raw("")])] }))
         .alignment(Alignment::Left)
         .block(
             Block::default()
             .borders(Borders::ALL)
             .style(Style::default())
-            .title(app.get_sel_task_title().unwrap_or_else(|| { String::from("") }))
+            .title(task_title)
         )
         .wrap(Wrap { trim: false });
 
