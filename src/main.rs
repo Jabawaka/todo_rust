@@ -28,7 +28,7 @@ use crossterm::{
 use serde::{Deserialize, Serialize};
 
 // ---- CONSTANTS ----
-const BLINK_TIME: Duration = Duration::from_millis(300);
+const BLINK_TIME: Duration = Duration::from_millis(400);
 
 
 // ---- STRUCT AND ENUM DEFINITION ----
@@ -91,10 +91,10 @@ struct App {
     tasks: Vec<Task>,
     state: AppState,
 
+    disp_string: String,
     edit_string: String,
     cursor_pos: usize,
     cursor_shown: bool,
-    blink_char: Option<char>,
     last_blink: Instant,
 }
 
@@ -117,10 +117,10 @@ impl App {
             tasks: parsed_tasks.to_owned(),
             state: AppState::Display,
 
+            disp_string: String::from(""),
             edit_string: String::from(""),
             cursor_pos: 0,
             cursor_shown: false,
-            blink_char: None,
             last_blink: Instant::now(),
         })
     }
@@ -129,10 +129,8 @@ impl App {
         for task in &mut self.tasks {
             if task.is_selected {
                 self.edit_string = task.description.clone();
-                self.edit_string.push(' ');
                 self.last_blink = Instant::now();
                 self.cursor_pos = self.edit_string.chars().count();
-                self.blink_char = None;
                 self.state = AppState::EditTask;
                 break;
             }
@@ -142,7 +140,6 @@ impl App {
     fn enter_display(&mut self) {
         for task in &mut self.tasks {
             if task.is_selected {
-                self.edit_string.pop();
                 task.description = self.edit_string.clone();
                 self.state = AppState::Display;
                 break;
@@ -151,21 +148,33 @@ impl App {
     }
 
     fn update_edit(&mut self) {
-        if self.cursor_pos < self.edit_string.chars().count() {
+        let first_part = &self.edit_string[0..self.cursor_pos];
+        let second_part = if self.cursor_pos < self.edit_string.chars().count() {
+            &self.edit_string[self.cursor_pos + 1..]
         } else {
-            self.blink_char = None;
+            ""
+        };
+        let blink_char = self.edit_string.chars().nth(self.cursor_pos).unwrap_or_else(|| {' '});
 
-            if self.last_blink.elapsed() > BLINK_TIME {
-                self.last_blink = Instant::now();
-                self.cursor_shown = !self.cursor_shown;
+        if self.last_blink.elapsed() > BLINK_TIME {
+            self.last_blink = Instant::now();
+            self.cursor_shown = !self.cursor_shown;
 
-                self.edit_string.pop();
-                if self.cursor_shown {
-                    self.edit_string.push('_');
-                } else {
-                    self.edit_string.push(' ');
-                }
-            }
+            self.disp_string = first_part.to_string();
+            self.disp_string.push(if self.cursor_shown {'_'} else {blink_char});
+            self.disp_string.push_str(second_part);
+        }
+    }
+
+    fn dec_cursor(&mut self) {
+        if self.cursor_pos > 0 {
+            self.cursor_pos -= 1;
+        }
+    }
+
+    fn inc_cursor(&mut self) {
+        if self.cursor_pos < self.edit_string.chars().count() {
+            self.cursor_pos += 1;
         }
     }
 
@@ -231,7 +240,7 @@ impl App {
             if task.is_selected {
                 let lines: Vec<&str> = match self.state {
                     AppState::Display => &task.description,
-                    AppState::EditTask => &self.edit_string,
+                    AppState::EditTask => &self.disp_string,
                 }.split("\n").collect();
 
                 let mut spans: Vec<Spans> = vec![];
@@ -258,16 +267,24 @@ impl App {
     }
 
     fn delete_in_field(&mut self) {
-        self.edit_string.pop();
-        self.edit_string.pop();
-        self.edit_string.push('_');
+        let first_part = &self.edit_string[0..self.cursor_pos];
+        let second_part = &self.edit_string[self.cursor_pos..];
+
+        let mut temp_str = first_part.to_string();
+        temp_str.pop();
+        temp_str.push_str(second_part);
+        self.edit_string = temp_str.clone();
         self.cursor_pos -= 1;
     }
 
     fn type_in_field(&mut self, c: char) {
-        self.edit_string.pop();
-        self.edit_string.push(c);
-        self.edit_string.push('_');
+        let first_part = &self.edit_string[0..self.cursor_pos];
+        let second_part = &self.edit_string[self.cursor_pos..];
+
+        let mut temp_str = first_part.to_string();
+        temp_str.push(c);
+        temp_str.push_str(second_part);
+        self.edit_string = temp_str.clone();
         self.cursor_pos += 1;
     }
 
@@ -400,6 +417,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Esc => app.enter_display(),
                             KeyCode::Backspace => app.delete_in_field(),
                             KeyCode::Enter => app.type_in_field('\n'),
+                            KeyCode::Left => app.dec_cursor(),
+                            KeyCode::Right => app.inc_cursor(),
                             KeyCode::Char(c) => app.type_in_field(c),
                             _ => {}
                         }
