@@ -91,8 +91,10 @@ struct App {
     tasks: Vec<Task>,
     state: AppState,
 
+    first_string: String,
+    blink_char: char,
+    second_string: String,
     disp_string: String,
-    edit_string: String,
     cursor_pos: usize,
     cursor_shown: bool,
     last_blink: Instant,
@@ -117,65 +119,18 @@ impl App {
             tasks: parsed_tasks.to_owned(),
             state: AppState::Display,
 
+            first_string: String::from(""),
+            blink_char: ' ',
+            second_string: String::from(""),
             disp_string: String::from(""),
-            edit_string: String::from(""),
             cursor_pos: 0,
             cursor_shown: false,
             last_blink: Instant::now(),
         })
     }
 
-    fn enter_edit(&mut self) {
-        for task in &mut self.tasks {
-            if task.is_selected {
-                self.edit_string = task.description.clone();
-                self.last_blink = Instant::now();
-                self.cursor_pos = self.edit_string.chars().count();
-                self.state = AppState::EditTask;
-                break;
-            }
-        }
-    }
-
-    fn enter_display(&mut self) {
-        for task in &mut self.tasks {
-            if task.is_selected {
-                task.description = self.edit_string.clone();
-                self.state = AppState::Display;
-                break;
-            }
-        }
-    }
-
-    fn update_edit(&mut self) {
-        let first_part = &self.edit_string[0..self.cursor_pos];
-        let second_part = if self.cursor_pos < self.edit_string.chars().count() {
-            &self.edit_string[self.cursor_pos + 1..]
-        } else {
-            ""
-        };
-        let blink_char = self.edit_string.chars().nth(self.cursor_pos).unwrap_or_else(|| {' '});
-
-        if self.last_blink.elapsed() > BLINK_TIME {
-            self.last_blink = Instant::now();
-            self.cursor_shown = !self.cursor_shown;
-
-            self.disp_string = first_part.to_string();
-            self.disp_string.push(if self.cursor_shown {'_'} else {blink_char});
-            self.disp_string.push_str(second_part);
-        }
-    }
-
-    fn dec_cursor(&mut self) {
-        if self.cursor_pos > 0 {
-            self.cursor_pos -= 1;
-        }
-    }
-
-    fn inc_cursor(&mut self) {
-        if self.cursor_pos < self.edit_string.chars().count() {
-            self.cursor_pos += 1;
-        }
+    fn save_to_db(&mut self) {
+        fs::write(&self.db_path, &serde_json::to_vec_pretty(&self.tasks).expect("DB should be writeable")).expect("DB should be writeable");
     }
 
     fn inc_sel_task(&mut self) {
@@ -202,6 +157,38 @@ impl App {
             }
 
             index += 1;
+        }
+    }
+
+    fn enter_edit(&mut self) {
+        for task in &mut self.tasks {
+            if task.is_selected {
+                self.first_string = task.description.clone();
+                self.blink_char = ' ';
+                self.second_string = String::from("");
+
+                self.last_blink = Instant::now();
+                self.cursor_pos = self.first_string.chars().count();
+
+                self.state = AppState::EditTask;
+                break;
+            }
+        }
+    }
+
+    fn enter_display(&mut self) {
+        for task in &mut self.tasks {
+            if task.is_selected {
+                task.description = self.first_string.clone();
+                if self.second_string.chars().count() > 0
+                {
+                    task.description.push(self.blink_char);
+                    task.description.push_str(&self.second_string);
+                }
+
+                self.state = AppState::Display;
+                break;
+            }
         }
     }
 
@@ -235,20 +222,61 @@ impl App {
         }
     }
 
-    fn get_sel_task_info(&self) -> Option<Vec<Spans>> {
+    fn dec_cursor(&mut self) {
+        if self.first_string.chars().count() > 0 {
+            self.second_string.insert(0, self.blink_char);
+            self.blink_char = self.first_string.pop().unwrap();
+            self.cursor_pos -= 1;
+            self.cursor_shown = true;
+            self.last_blink = Instant::now();
+        }
+    }
+
+    fn inc_cursor(&mut self) {
+        if self.second_string.chars().count() > 0 {
+            self.first_string.push(self.blink_char);
+            self.blink_char = self.second_string.remove(0);
+            self.cursor_pos += 1;
+            self.cursor_shown = true;
+            self.last_blink = Instant::now();
+        }
+    }
+
+    fn get_sel_task_info(&mut self) -> Option<Vec<Spans>> {
         for task in &self.tasks {
             if task.is_selected {
-                let lines: Vec<&str> = match self.state {
-                    AppState::Display => &task.description,
-                    AppState::EditTask => &self.disp_string,
-                }.split("\n").collect();
-
                 let mut spans: Vec<Spans> = vec![];
+                match self.state {
+                    AppState::Display => {
+                        let lines: Vec<&str> = task.description.split("\n").collect();
 
-                for line in lines {
-                    spans.push(Spans::from(vec![Span::raw(line)]));
+                        for line in lines {
+                            spans.push(Spans::from(vec![Span::raw(line)]));
+                        }
+                    }
+                    AppState::EditTask => {
+                        let blink_char = if self.cursor_shown {
+                            '_'
+                        } else {
+                            self.blink_char
+                        };
+
+                        if self.last_event.elapsed() > BLINK_TIME {
+                            self.cursor_shown = !self.cursor_shown;
+                            self.last_event = Instant::now();
+                        }
+
+                        self.disp_string = self.first_string.clone();
+                        self.disp_string.push(blink_char);
+                        self.disp_string.push_str(&self.second_string);
+
+                        let lines: Vec<&str> = self.disp_string.split("\n").collect();
+
+                        for line in lines {
+                            spans.push(Spans::from(vec![Span::raw(line)]));
+                        }
+                    }
                 }
-
                 return Some(spans);
             }
         }
@@ -267,24 +295,14 @@ impl App {
     }
 
     fn delete_in_field(&mut self) {
-        let first_part = &self.edit_string[0..self.cursor_pos];
-        let second_part = &self.edit_string[self.cursor_pos..];
-
-        let mut temp_str = first_part.to_string();
-        temp_str.pop();
-        temp_str.push_str(second_part);
-        self.edit_string = temp_str.clone();
-        self.cursor_pos -= 1;
+        if self.first_string.chars().count() > 0 {
+            self.first_string.pop();
+            self.cursor_pos -= 1;
+        }
     }
 
     fn type_in_field(&mut self, c: char) {
-        let first_part = &self.edit_string[0..self.cursor_pos];
-        let second_part = &self.edit_string[self.cursor_pos..];
-
-        let mut temp_str = first_part.to_string();
-        temp_str.push(c);
-        temp_str.push_str(second_part);
-        self.edit_string = temp_str.clone();
+        self.first_string.push(c);
         self.cursor_pos += 1;
     }
 
@@ -299,10 +317,6 @@ impl App {
             created_on: Utc::now(),
         };
         self.tasks.push(task.clone());
-    }
-
-    fn save_to_db(&mut self) {
-        fs::write(&self.db_path, &serde_json::to_vec_pretty(&self.tasks).expect("DB should be writeable")).expect("DB should be writeable");
     }
 }
 
@@ -387,7 +401,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
 
     // MAIN LOOP
     loop {
-        terminal.draw(|f| ui(f, &app))?;
+        terminal.draw(|f| ui(f, &mut app))?;
 
         match app.state {
             AppState::Display => {
@@ -425,15 +439,13 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                     },
                     Event::Tick => {},
                 }
-
-                app.update_edit();
             },
         }
     }
 }
 
 // UI function
-fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let size = f.size();
 
     let chunks = Layout::default()
