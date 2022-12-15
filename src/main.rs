@@ -91,6 +91,8 @@ struct App {
     tasks: Vec<Task>,
     state: AppState,
 
+    desc_width: u16,
+
     first_string: String,
     blink_char: char,
     second_string: String,
@@ -118,6 +120,8 @@ impl App {
             last_event: Instant::now(),
             tasks: parsed_tasks.to_owned(),
             state: AppState::Display,
+
+            desc_width: 0,
 
             first_string: String::from(""),
             blink_char: ' ',
@@ -257,6 +261,8 @@ impl App {
                     AppState::EditTask => {
                         let blink_char = if self.cursor_shown {
                             '_'
+                        } else if self.blink_char == '\n' {
+                            ' '
                         } else {
                             self.blink_char
                         };
@@ -268,6 +274,9 @@ impl App {
 
                         self.disp_string = self.first_string.clone();
                         self.disp_string.push(blink_char);
+                        if self.blink_char == '\n' {
+                            self.disp_string.push('\n');
+                        }
                         self.disp_string.push_str(&self.second_string);
 
                         let lines: Vec<&str> = self.disp_string.split("\n").collect();
@@ -462,11 +471,13 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Percentage(30),
                 Constraint::Percentage(20),
-                Constraint::Percentage(50),
+                Constraint::Percentage(20),
+                Constraint::Percentage(60),
             ]
         ).split(chunks[0]);
+
+    app.desc_width = vsplit_layout[2].width - 2;
 
     let tasks: Vec<_> = app.tasks
         .iter()
@@ -553,7 +564,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .wrap(Wrap { trim: false });
 
-    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task | enter - Mark task as active")
+    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task | 'e' - Edit task | enter - Mark task as active")
         .style(Style::default())
         .alignment(Alignment::Center)
         .block(
