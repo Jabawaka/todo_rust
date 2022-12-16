@@ -391,22 +391,7 @@ impl App {
     fn get_sel_task_title(&self) -> Option<String> {
         for task in &self.tasks {
             if task.is_selected {
-                let mut string = String::from("");
-                let (x, y) = self.get_cursor_pos();
-                string.push('(');
-                string.push_str(&x.to_string());
-                string.push(',');
-                string.push_str(&y.to_string());
-                string.push(')');
-                string.push_str(&self.cursor_pos.to_string());
-                string.push(':');
-                string.push_str(&self.first_string.chars().count().to_string());
-                string.push('/');
-                string.push(self.blink_char);
-                string.push('/');
-                string.push_str(&self.second_string.chars().count().to_string());
-                return Some(string.clone());
-                //return Some(task.title.clone());
+                return Some(task.title.clone());
             }
         }
 
