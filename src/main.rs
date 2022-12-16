@@ -91,7 +91,7 @@ struct App {
     tasks: Vec<Task>,
     state: AppState,
 
-    desc_width: u16,
+    desc_width_char: u16,
 
     first_string: String,
     blink_char: char,
@@ -121,7 +121,7 @@ impl App {
             tasks: parsed_tasks.to_owned(),
             state: AppState::Display,
 
-            desc_width: 0,
+            desc_width_char: 0,
 
             first_string: String::from(""),
             blink_char: ' ',
@@ -226,6 +226,83 @@ impl App {
         }
     }
 
+    fn get_cursor_pos(&self) -> (u16, u16) {
+        let mut index = 0;
+        let mut x = 0;
+        let mut y = 0;
+
+        while index < self.first_string.chars().count() {
+            if self.first_string.chars().nth(index).unwrap() == '\n' {
+                y += 1;
+                x = 0;
+            } else if x >= self.desc_width_char {
+                y += 1;
+                x -= self.desc_width_char;
+            } else {
+                x += 1;
+            }
+            index += 1;
+        }
+
+        (x, y)
+    }
+
+    fn set_cursor_pos(&mut self, des_x: u16, des_y: u16) {
+        let mut curr_x = 0;
+        let mut curr_y = 0;
+        let mut index = 0;
+
+        let mut cursor_set = false;
+
+        let mut new_string = self.first_string.clone();
+        if self.second_string.chars().count() > 0 {
+            new_string.push(self.blink_char);
+            new_string.push_str(&self.second_string);
+        }
+
+        while index < new_string.chars().count() {
+            if curr_x >= des_x && curr_y == des_y {
+                self.cursor_pos = index;
+
+                self.first_string = new_string.drain(..self.cursor_pos).collect();
+                self.blink_char = new_string.remove(0);
+                self.second_string = new_string.clone();
+                cursor_set = true;
+                break;
+            }
+
+            if new_string.chars().nth(index).unwrap() == '\n' {
+                if curr_y == des_y {
+                    self.cursor_pos = index;
+
+                    self.first_string = new_string.drain(..self.cursor_pos).collect();
+                    self.blink_char = new_string.remove(0);
+                    self.second_string = new_string.clone();
+                    cursor_set = true;
+                    break;
+                } else {
+                    curr_x = 0;
+                    curr_y += 1;
+                }
+            } else if curr_x >= self.desc_width_char {
+                curr_x -= self.desc_width_char;
+                curr_y += 1;
+            } else {
+                curr_x += 1;
+            }
+
+            index += 1;
+        }
+
+        if !cursor_set {
+            self.first_string = new_string.clone();
+            self.blink_char = ' ';
+            self.second_string = String::from("");
+
+            self.cursor_pos = self.first_string.chars().count();
+        }
+    }
+
     fn dec_cursor(&mut self) {
         if self.first_string.chars().count() > 0 {
             self.second_string.insert(0, self.blink_char);
@@ -244,6 +321,24 @@ impl App {
             self.cursor_shown = true;
             self.last_blink = Instant::now();
         }
+    }
+
+    fn dec_line(&mut self) {
+        if self.cursor_pos > 0 {
+            let (x, y) = self.get_cursor_pos();
+
+            if y > 0 {
+                self.set_cursor_pos(x, y - 1);
+            } else {
+                self.set_cursor_pos(0, 0);
+            }
+        }
+    }
+
+    fn inc_line(&mut self) {
+        let (x, y) = self.get_cursor_pos();
+
+        self.set_cursor_pos(x, y + 1);
     }
 
     fn get_sel_task_info(&mut self) -> Option<Vec<Spans>> {
@@ -296,7 +391,22 @@ impl App {
     fn get_sel_task_title(&self) -> Option<String> {
         for task in &self.tasks {
             if task.is_selected {
-                return Some(task.title.clone());
+                let mut string = String::from("");
+                let (x, y) = self.get_cursor_pos();
+                string.push('(');
+                string.push_str(&x.to_string());
+                string.push(',');
+                string.push_str(&y.to_string());
+                string.push(')');
+                string.push_str(&self.cursor_pos.to_string());
+                string.push(':');
+                string.push_str(&self.first_string.chars().count().to_string());
+                string.push('/');
+                string.push(self.blink_char);
+                string.push('/');
+                string.push_str(&self.second_string.chars().count().to_string());
+                return Some(string.clone());
+                //return Some(task.title.clone());
             }
         }
 
@@ -442,6 +552,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Enter => app.type_in_field('\n'),
                             KeyCode::Left => app.dec_cursor(),
                             KeyCode::Right => app.inc_cursor(),
+                            KeyCode::Up => app.dec_line(),
+                            KeyCode::Down => app.inc_line(),
                             KeyCode::Char(c) => app.type_in_field(c),
                             _ => {}
                         }
@@ -477,7 +589,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             ]
         ).split(chunks[0]);
 
-    app.desc_width = vsplit_layout[2].width - 2;
+    app.desc_width_char = vsplit_layout[2].width - 2;
 
     let tasks: Vec<_> = app.tasks
         .iter()
