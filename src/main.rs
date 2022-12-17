@@ -37,9 +37,16 @@ enum Event<I> {
     Tick,
 }
 
+#[derive(PartialEq)]
 enum AppState {
     Display,
     EditTask,
+}
+
+#[derive(PartialEq)]
+enum EditField {
+    Title,
+    Description,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -90,6 +97,7 @@ struct App {
     last_event: Instant,
     tasks: Vec<Task>,
     state: AppState,
+    edit_field: EditField,
 
     desc_width_char: u16,
 
@@ -120,11 +128,12 @@ impl App {
             last_event: Instant::now(),
             tasks: parsed_tasks.to_owned(),
             state: AppState::Display,
+            edit_field: EditField::Description,
 
             desc_width_char: 0,
 
             first_string: String::from(""),
-            blink_char: ' ',
+            blink_char: '\t',
             second_string: String::from(""),
             disp_string: String::from(""),
             cursor_pos: 0,
@@ -168,13 +177,14 @@ impl App {
         for task in &mut self.tasks {
             if task.is_selected {
                 self.first_string = task.description.clone();
-                self.blink_char = ' ';
+                self.blink_char = '\t';
                 self.second_string = String::from("");
 
                 self.last_blink = Instant::now();
                 self.cursor_pos = self.first_string.chars().count();
 
                 self.state = AppState::EditTask;
+                self.edit_field = EditField::Description;
                 break;
             }
         }
@@ -183,15 +193,68 @@ impl App {
     fn enter_display(&mut self) {
         for task in &mut self.tasks {
             if task.is_selected {
-                task.description = self.first_string.clone();
-                if self.second_string.chars().count() > 0
-                {
-                    task.description.push(self.blink_char);
-                    task.description.push_str(&self.second_string);
-                }
+                match self.edit_field {
+                    EditField::Title => {
+                        task.title = self.first_string.clone();
+                        if self.second_string.chars().count() > 0
+                        {
+                            task.title.push(self.blink_char);
+                            task.title.push_str(&self.second_string);
+                        }
 
+                        task.title.retain(|c| c != '\t');
+                    },
+                    EditField::Description => {
+                        task.description = self.first_string.clone();
+                        if self.second_string.chars().count() > 0
+                        {
+                            task.description.push(self.blink_char);
+                            task.description.push_str(&self.second_string);
+                        }
+                    }
+                }
                 self.state = AppState::Display;
-                break;
+            }
+        }
+    }
+
+    fn change_field(&mut self) {
+        for task in &mut self.tasks {
+            if task.is_selected {
+                match self.edit_field {
+                    EditField::Title => {
+                        task.title = self.first_string.clone();
+                        if self.second_string.chars().count() > 0
+                        {
+                            task.title.push(self.blink_char);
+                            task.title.push_str(&self.second_string);
+                        }
+                        self.first_string = task.description.clone();
+                        self.blink_char = '\t';
+                        self.second_string = String::from("");
+
+                        self.last_blink = Instant::now();
+                        self.cursor_pos = self.first_string.chars().count();
+
+                        self.edit_field = EditField::Description;
+                    },
+                    EditField::Description => {
+                        task.description = self.first_string.clone();
+                        if self.second_string.chars().count() > 0
+                        {
+                            task.description.push(self.blink_char);
+                            task.description.push_str(&self.second_string);
+                        }
+                        self.first_string = task.title.clone();
+                        self.blink_char = '\t';
+                        self.second_string = String::from("");
+
+                        self.last_blink = Instant::now();
+                        self.cursor_pos = self.first_string.chars().count();
+
+                        self.edit_field = EditField::Title;
+                    },
+                }
             }
         }
     }
@@ -345,42 +408,40 @@ impl App {
         for task in &self.tasks {
             if task.is_selected {
                 let mut spans: Vec<Spans> = vec![];
-                match self.state {
-                    AppState::Display => {
-                        let lines: Vec<&str> = task.description.split("\n").collect();
-
-                        for line in lines {
-                            spans.push(Spans::from(vec![Span::raw(line)]));
-                        }
+                if self.state == AppState::EditTask && self.edit_field == EditField::Description {
+                    if self.last_event.elapsed() > BLINK_TIME {
+                        self.cursor_shown = !self.cursor_shown;
+                        self.last_event = Instant::now();
                     }
-                    AppState::EditTask => {
-                        let blink_char = if self.cursor_shown {
-                            '_'
-                        } else if self.blink_char == '\n' {
-                            ' '
-                        } else {
-                            self.blink_char
-                        };
 
-                        if self.last_event.elapsed() > BLINK_TIME {
-                            self.cursor_shown = !self.cursor_shown;
-                            self.last_event = Instant::now();
-                        }
+                    let blink_char = if self.cursor_shown {
+                        '_'
+                    } else if self.blink_char == '\n' {
+                        ' '
+                    } else {
+                        self.blink_char
+                    };
 
-                        self.disp_string = self.first_string.clone();
-                        self.disp_string.push(blink_char);
-                        if self.blink_char == '\n' {
-                            self.disp_string.push('\n');
-                        }
-                        self.disp_string.push_str(&self.second_string);
+                    self.disp_string = self.first_string.clone();
+                    self.disp_string.push(blink_char);
+                    if self.blink_char == '\n' {
+                        self.disp_string.push('\n');
+                    }
+                    self.disp_string.push_str(&self.second_string);
 
-                        let lines: Vec<&str> = self.disp_string.split("\n").collect();
+                    let lines: Vec<&str> = self.disp_string.split("\n").collect();
 
-                        for line in lines {
-                            spans.push(Spans::from(vec![Span::raw(line)]));
-                        }
+                    for line in lines {
+                        spans.push(Spans::from(vec![Span::raw(line)]));
+                    }
+                } else {
+                    let lines: Vec<&str> = task.description.split("\n").collect();
+
+                    for line in lines {
+                        spans.push(Spans::from(vec![Span::raw(line)]));
                     }
                 }
+
                 return Some(spans);
             }
         }
@@ -388,10 +449,31 @@ impl App {
         None
     }
 
-    fn get_sel_task_title(&self) -> Option<String> {
+    fn get_sel_task_title(&mut self) -> Option<String> {
         for task in &self.tasks {
             if task.is_selected {
-                return Some(task.title.clone());
+                if self.state == AppState::EditTask && self.edit_field == EditField::Title {
+                    if self.last_event.elapsed() > BLINK_TIME {
+                        self.cursor_shown = !self.cursor_shown;
+                        self.last_event = Instant::now();
+                    }
+
+                    let blink_char = if self.cursor_shown {
+                        '_'
+                    } else if self.blink_char == '\n' {
+                        ' '
+                    } else {
+                        self.blink_char
+                    };
+
+                    self.disp_string = self.first_string.clone();
+                    self.disp_string.push(blink_char);
+                    self.disp_string.push_str(&self.second_string);
+
+                    return Some(self.disp_string.clone());
+                } else {
+                    return Some(task.title.clone());
+                }
             }
         }
 
@@ -540,6 +622,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Up => app.dec_line(),
                             KeyCode::Down => app.inc_line(),
                             KeyCode::Char(c) => app.type_in_field(c),
+                            KeyCode::Tab => app.change_field(),
                             _ => {}
                         }
                     },
