@@ -11,10 +11,10 @@ use chrono::prelude::*;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Spans, Span},
     widgets::{
-        Block, BorderType, Borders, Paragraph, Wrap,
+        Block, BorderType, Borders, Paragraph, Tabs, Wrap,
     },
     Frame, Terminal,
 };
@@ -40,6 +40,19 @@ enum Event<I> {
 enum AppState {
     Display,
     EditTask,
+    Stats,
+    Settings,
+}
+
+impl From<AppState> for usize {
+    fn from(input: AppState) -> usize {
+        match input {
+            AppState::Display  => 0,
+            AppState::EditTask => 1,
+            AppState::Stats    => 2,
+            AppState::Settings => 3,
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -98,7 +111,7 @@ struct App {
     state: AppState,
     edit_field: EditField,
 
-    // Box size
+    // Displaying variables
     desc_width_char: u16,
 
     // Editing variables
@@ -641,7 +654,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                     Event::Input(key) => {
                         match key.code {
                             KeyCode::Char('q') => {app.save_to_db(); return Ok(())},
-                            KeyCode::Esc => return Ok(()),
+                            KeyCode::Esc => {app.save_to_db(); return Ok(())},
                             KeyCode::Char('j') => app.inc_sel_task(),
                             KeyCode::Char('k') => app.dec_sel_task(),
                             KeyCode::Down => app.inc_sel_task(),
@@ -676,12 +689,25 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                     Event::Tick => {},
                 }
             },
+            AppState::Stats => {},
+            AppState::Settings => {},
         }
     }
 }
 
 // UI function
 fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+    match app.state {
+        AppState::Display => render_tasks(f, app),
+        AppState::EditTask => render_tasks(f, app),
+        AppState::Stats => {},
+        AppState::Settings => render_settings(f, app),
+    }
+}
+
+
+// Render tasks screen
+fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let size = f.size();
 
     let chunks = Layout::default()
@@ -689,6 +715,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .margin(2)
         .constraints(
             [
+                Constraint::Length(2),
                 Constraint::Min(2),
                 Constraint::Length(4),
             ].as_ref(),
@@ -702,11 +729,38 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 Constraint::Percentage(20),
                 Constraint::Percentage(60),
             ]
-        ).split(chunks[0]);
+        ).split(chunks[1]);
 
+    // Capture displaying variables
     app.desc_width_char = vsplit_layout[2].width - 2;
     let default_style = app.default.clone();
 
+    // Render menu
+    let menu_titles = vec!["Tasks", "Stats", "Settings"];
+    let menu = menu_titles
+        .iter()
+        .map(|t| {
+            let (first, rest) = t.split_at(1);
+            Spans::from(vec![
+                Span::styled(
+                    first,
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::UNDERLINED),
+                ),
+                Span::styled(rest, default_style),
+            ])
+        })
+        .collect();
+
+    let tabs = Tabs::new(menu)
+        .select(AppState::Display.into())
+        .block(Block::default().title("Menu").borders(Borders::BOTTOM))
+        .style(default_style)
+        .highlight_style(app.highlight)
+        .divider(Span::styled("|", default_style));
+
+    // Render tasks information
     let mut tasks: Vec<_> = app.tasks
         .iter()
         .map(|task| {
@@ -786,7 +840,8 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .wrap(Wrap { trim: false });
 
-    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | enter   - Activate task\n'j' - Go up             | 'k' - Go down          | 'c' - Archive tasks    | esc,'q' - Quit         ")
+    // Render instructions
+    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | 'h' - Go to left tab   | 'l' - Go to right tab  \n'c' - Archive tasks     | enter - Activate task  | esc,'q' - Quit         |                        ")
         .style(default_style)
         .alignment(Alignment::Center)
         .block(
@@ -796,8 +851,25 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 .border_type(BorderType::Double)
         );
 
+    f.render_widget(tabs, chunks[0]);
     f.render_widget(task_block, vsplit_layout[0]);
     f.render_widget(task_dur_block, vsplit_layout[1]);
     f.render_widget(task_description, vsplit_layout[2]);
-    f.render_widget(instructions, chunks[1]);
+    f.render_widget(instructions, chunks[2]);
+}
+
+
+// Render settings
+fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+    let size = f.size();
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(2)
+        .constraints(
+            [
+                Constraint::Min(2),
+                Constraint::Length(4),
+            ].as_ref(),
+        ).split(size);
 }
