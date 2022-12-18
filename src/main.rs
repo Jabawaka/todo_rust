@@ -690,7 +690,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .constraints(
             [
                 Constraint::Min(2),
-                Constraint::Length(3),
+                Constraint::Length(4),
             ].as_ref(),
         ).split(size);
 
@@ -783,7 +783,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .wrap(Wrap { trim: false });
 
-    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task | 'e' - Edit task | enter - Mark task as active")
+    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | enter   - Activate task\n'j' - Go up             | 'k' - Go down          | 'c' - Archive tasks    | esc,'q' - Quit         ")
         .style(default_style)
         .alignment(Alignment::Center)
         .block(
