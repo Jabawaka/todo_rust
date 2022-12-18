@@ -705,8 +705,9 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         ).split(chunks[0]);
 
     app.desc_width_char = vsplit_layout[2].width - 2;
+    let default_style = app.default.clone();
 
-    let tasks: Vec<_> = app.tasks
+    let mut tasks: Vec<_> = app.tasks
         .iter()
         .map(|task| {
             let mut disp_string = String::from("");
@@ -732,7 +733,9 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         })
         .collect();
 
-    let tasks_duration: Vec<_> = app.tasks
+    tasks.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
+
+    let mut tasks_duration: Vec<_> = app.tasks
         .iter()
         .map(|task| {
             let mut style = app.default;
@@ -750,8 +753,8 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         })
         .collect();
 
+    tasks_duration.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
 
-    let default_style = app.default.clone();
     let task_block = Paragraph::new(tasks)
         .alignment(Alignment::Left)
         .block(
