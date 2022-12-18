@@ -1,26 +1,38 @@
 [
   {
     "title": "Implement deletion of tasks\n",
-    "description": "Implement the ability to delete tasks upon pressing the 'd' key.",
-    "is_done": false,
+    "description": "Implement the ability to delete tasks upon pressing the 'd' key. Well I may edit this task while I am doing stuff and the time should increase.",
+    "is_done": true,
     "is_active": false,
-    "is_selected": false,
+    "is_selected": true,
     "elapsed_time": {
-      "secs": 0,
-      "nanos": 0
+      "secs": 9,
+      "nanos": 713170112
     },
     "created_on": "2022-12-18T10:15:11.761102Z"
   },
   {
     "title": "Cursor behaviour",
     "description": "Implement all normal cursor behaviour:\n - Going back and forward through the command line.\n - Going up and down lines.\n - At end/beginning of lines, go to the end/beginning of line.",
-    "is_done": false,
+    "is_done": true,
     "is_active": false,
-    "is_selected": true,
+    "is_selected": false,
     "elapsed_time": {
-      "secs": 0,
-      "nanos": 0
+      "secs": 3,
+      "nanos": 749001041
     },
     "created_on": "2022-12-18T10:16:00.758822Z"
+  },
+  {
+    "title": "Implement closure of tasks",
+    "description": "Upon pressing the 'c' key, the done tasks shall disappear from the list and their stats archived.",
+    "is_done": false,
+    "is_active": false,
+    "is_selected": false,
+    "elapsed_time": {
+      "secs": 407,
+      "nanos": 97274740
+    },
+    "created_on": "2022-12-18T20:39:04.050892Z"
   }
 ]

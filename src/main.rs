@@ -11,7 +11,7 @@ use chrono::prelude::*;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
     text::{Spans, Span},
     widgets::{
         Block, BorderType, Borders, Paragraph, Wrap,
@@ -29,7 +29,6 @@ use serde::{Deserialize, Serialize};
 
 // ---- CONSTANTS ----
 const BLINK_TIME: Duration = Duration::from_millis(400);
-
 
 // ---- STRUCT AND ENUM DEFINITION ----
 enum Event<I> {
@@ -81,9 +80,8 @@ impl Task {
         time_str
     }
 
-    fn toggle_active(&mut self, elapsed_time: Duration) {
+    fn toggle_active(&mut self) {
         if self.is_active {
-            self.elapsed_time += elapsed_time;
             self.is_active = false;
         } else {
             self.is_active = true;
@@ -93,14 +91,17 @@ impl Task {
 
 
 struct App {
+    // App state
     db_path: String,
     last_event: Instant,
     tasks: Vec<Task>,
     state: AppState,
     edit_field: EditField,
 
+    // Box size
     desc_width_char: u16,
 
+    // Editing variables
     first_string: String,
     blink_char: char,
     second_string: String,
@@ -108,6 +109,12 @@ struct App {
     cursor_pos: usize,
     cursor_shown: bool,
     last_blink: Instant,
+
+    // Styles
+    default: Style,
+    highlight: Style,
+    active_normal: Style,
+    active_highlight: Style,
 }
 
 impl App {
@@ -139,6 +146,11 @@ impl App {
             cursor_pos: 0,
             cursor_shown: false,
             last_blink: Instant::now(),
+
+            default:          Style::default().fg(Color::White).bg(Color::Black),
+            highlight:        Style::default().fg(Color::Black).bg(Color::White),
+            active_normal:    Style::default().fg(Color::Green).bg(Color::Black),
+            active_highlight: Style::default().fg(Color::Green).bg(Color::White),
         })
     }
 
@@ -262,31 +274,33 @@ impl App {
         }
     }
 
-    fn activate_task(&mut self) {
-        let now = Instant::now();
+    fn update_times(&mut self) {
+        for task in &mut self.tasks {
+            if task.is_active {
+                task.elapsed_time += self.last_event.elapsed();
+                self.last_event = Instant::now();
+            }
+        }
+    }
 
+    fn activate_task(&mut self) {
         for task in &mut self.tasks {
             // For the current active task do the ellapsed time and reset it
             if task.is_active {
-                task.toggle_active(self.last_event.elapsed());
-                self.last_event = now;
+                task.toggle_active();
             } else if task.is_selected && !task.is_done {
-                task.toggle_active(self.last_event.elapsed());
-                self.last_event = now;
+                task.toggle_active();
             }
         }
     }
 
     fn do_undo_task(&mut self) {
-        let now = Instant::now();
-
         for task in &mut self.tasks {
             if task.is_selected {
                 task.is_done = !task.is_done;
 
                 if task.is_done && task.is_active {
-                    task.toggle_active(self.last_event.elapsed());
-                    self.last_event = now;
+                    task.toggle_active();
                 }
             }
         }
@@ -412,9 +426,9 @@ impl App {
             if task.is_selected {
                 let mut spans: Vec<Spans> = vec![];
                 if self.state == AppState::EditTask && self.edit_field == EditField::Description {
-                    if self.last_event.elapsed() > BLINK_TIME {
+                    if self.last_blink.elapsed() > BLINK_TIME {
                         self.cursor_shown = !self.cursor_shown;
-                        self.last_event = Instant::now();
+                        self.last_blink = Instant::now();
                     }
 
                     let blink_char = if self.cursor_shown {
@@ -425,7 +439,8 @@ impl App {
                         self.blink_char
                     };
 
-                    self.disp_string = self.first_string.clone();
+                    self.disp_string = String::from("\n");
+                    self.disp_string.push_str(&self.first_string);
                     self.disp_string.push(blink_char);
                     if self.blink_char == '\n' {
                         self.disp_string.push('\n');
@@ -438,7 +453,9 @@ impl App {
                         spans.push(Spans::from(vec![Span::raw(line)]));
                     }
                 } else {
-                    let lines: Vec<&str> = task.description.split("\n").collect();
+                    self.disp_string = String::from("\n");
+                    self.disp_string.push_str(&task.description);
+                    let lines: Vec<&str> = self.disp_string.split("\n").collect();
 
                     for line in lines {
                         spans.push(Spans::from(vec![Span::raw(line)]));
@@ -456,9 +473,9 @@ impl App {
         for task in &self.tasks {
             if task.is_selected {
                 if self.state == AppState::EditTask && self.edit_field == EditField::Title {
-                    if self.last_event.elapsed() > BLINK_TIME {
+                    if self.last_blink.elapsed() > BLINK_TIME {
                         self.cursor_shown = !self.cursor_shown;
-                        self.last_event = Instant::now();
+                        self.last_blink = Instant::now();
                     }
 
                     let blink_char = if self.cursor_shown {
@@ -616,6 +633,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
     loop {
         terminal.draw(|f| ui(f, &mut app))?;
 
+        app.update_times();
+
         match app.state {
             AppState::Display => {
                 match rx.recv()? {
@@ -698,20 +717,15 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             }
             disp_string.push_str(&task.title);
 
-            let mut fg_color = Color::Gray;
+            let mut style = app.default;
             if task.is_selected {
-                fg_color = Color::Black;
-            }
-            if task.is_active {
-                fg_color = Color::Green;
-            }
-
-            let mut style = Style::default().fg(fg_color);
-            if task.is_selected {
-                style = Style::default()
-                    .bg(Color::Gray)
-                    .fg(fg_color)
-                    .add_modifier(Modifier::BOLD);
+                if task.is_active {
+                    style = app.active_highlight;
+                } else {
+                    style = app.highlight;
+                }
+            } else if task.is_active {
+                style = app.active_normal;
             }
 
             Spans::from(vec![Span::styled(disp_string, style)])
@@ -721,32 +735,29 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let tasks_duration: Vec<_> = app.tasks
         .iter()
         .map(|task| {
-            let mut fg_color = Color::Gray;
+            let mut style = app.default;
             if task.is_selected {
-                fg_color = Color::Black;
-            }
-            if task.is_active {
-                fg_color = Color::Green;
-            }
-
-            let mut style = Style::default().fg(fg_color);
-            if task.is_selected {
-                style = Style::default()
-                    .bg(Color::Gray)
-                    .fg(fg_color)
-                    .add_modifier(Modifier::BOLD);
+                if task.is_active {
+                    style = app.active_highlight;
+                } else {
+                    style = app.highlight;
+                }
+            } else if task.is_active {
+                style = app.active_normal;
             }
 
             Spans::from(vec![Span::styled(task.get_time_str(), style)])
         })
         .collect();
 
+
+    let default_style = app.default.clone();
     let task_block = Paragraph::new(tasks)
         .alignment(Alignment::Left)
         .block(
             Block::default()
             .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
-            .style(Style::default())
+            .style(default_style)
             .title(" To Do ")
         );
 
@@ -755,7 +766,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .block(
             Block::default()
             .borders(Borders::RIGHT | Borders::TOP | Borders::BOTTOM)
-            .style(Style::default())
+            .style(default_style)
         );
 
     let mut task_title = String::from(" ");
@@ -767,18 +778,18 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .block(
             Block::default()
             .borders(Borders::ALL)
-            .style(Style::default())
+            .style(default_style)
             .title(task_title)
         )
         .wrap(Wrap { trim: false });
 
     let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task | 'e' - Edit task | enter - Mark task as active")
-        .style(Style::default())
+        .style(default_style)
         .alignment(Alignment::Center)
         .block(
             Block::default()
                 .borders(Borders::TOP)
-                .style(Style::default())
+                .style(default_style)
                 .border_type(BorderType::Double)
         );
 
