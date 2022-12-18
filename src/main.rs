@@ -173,10 +173,13 @@ impl App {
         }
     }
 
-    fn enter_edit(&mut self) {
+    fn enter_edit(&mut self, edit: EditField) {
         for task in &mut self.tasks {
             if task.is_selected {
-                self.first_string = task.description.clone();
+                match edit {
+                    EditField::Title => self.first_string = task.title.clone(),
+                    EditField::Description => self.first_string = task.description.clone(),
+                }
                 self.blink_char = '\t';
                 self.second_string = String::from("");
 
@@ -184,7 +187,7 @@ impl App {
                 self.cursor_pos = self.first_string.chars().count();
 
                 self.state = AppState::EditTask;
-                self.edit_field = EditField::Description;
+                self.edit_field = edit;
                 break;
             }
         }
@@ -492,17 +495,41 @@ impl App {
         self.cursor_pos += 1;
     }
 
-    fn add_test_task(&mut self) {
+    fn add_task(&mut self) {
+        for task in &mut self.tasks {
+            task.is_selected = false;
+        }
         let task = Task {
-            title: String::from("test"),
-            description: String::from("This is a test"),
+            title: String::from(""),
+            description: String::from(""),
             is_done: false,
             is_active: false,
-            is_selected: false,
-            elapsed_time: Duration::new(5, 0),
+            is_selected: true,
+            elapsed_time: Duration::new(0, 0),
             created_on: Utc::now(),
         };
         self.tasks.push(task.clone());
+
+        self.enter_edit(EditField::Title);
+    }
+
+    fn del_task(&mut self) {
+        let mut index = 0;
+        while index < self.tasks.len() {
+            if self.tasks[index].is_selected {
+                self.tasks.remove(index);
+
+                if self.tasks.len() > 0 {
+                    if index < self.tasks.len() {
+                        self.tasks[index].is_selected = true;
+                    } else {
+                        self.tasks[index - 1].is_selected = true;
+                    }
+                }
+                break;
+            }
+            index += 1;
+        }
     }
 }
 
@@ -602,8 +629,9 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Up => app.dec_sel_task(),
                             KeyCode::Enter => app.activate_task(),
                             KeyCode::Char(' ') => app.do_undo_task(),
-                            KeyCode::Char('a') => {app.add_test_task(); app.save_to_db()},
-                            KeyCode::Char('e') => app.enter_edit(),
+                            KeyCode::Char('a') => app.add_task(),
+                            KeyCode::Char('d') => app.del_task(),
+                            KeyCode::Char('e') => app.enter_edit(EditField::Description),
                             _ => {}
                         }
                     },
