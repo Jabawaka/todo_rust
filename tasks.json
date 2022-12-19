@@ -4,7 +4,7 @@
     "description": "Implement the ability to delete tasks upon pressing the 'd' key. Well I may edit this task while I am doing stuff and the time should increase.",
     "is_done": true,
     "is_active": false,
-    "is_selected": true,
+    "is_selected": false,
     "elapsed_time": {
       "secs": 9,
       "nanos": 713170112
@@ -25,14 +25,38 @@
   },
   {
     "title": "Implement closure of tasks",
-    "description": "Upon pressing the 'c' key, the done tasks shall disappear from the list and their stats archived.",
+    "description": "Upon pressing the 'c' key, the tasks marked as done shall disappear from the list.",
     "is_done": false,
     "is_active": false,
     "is_selected": false,
     "elapsed_time": {
-      "secs": 407,
-      "nanos": 97274740
+      "secs": 450,
+      "nanos": 448251140
     },
     "created_on": "2022-12-18T20:39:04.050892Z"
+  },
+  {
+    "title": "Pop up for adding/editing a task",
+    "description": "At the moment tasks are added by directly editing the description and title in the display box. However it would be better to introduce a pop up for editing and adding.",
+    "is_done": false,
+    "is_active": false,
+    "is_selected": false,
+    "elapsed_time": {
+      "secs": 0,
+      "nanos": 0
+    },
+    "created_on": "2022-12-19T08:47:46.797634100Z"
+  },
+  {
+    "title": "Settings page",
+    "description": "A settings page with the ability to change the colour schemes, the layout between vertical and horizontal split. Remember to put an example at the bottom of it.",
+    "is_done": false,
+    "is_active": false,
+    "is_selected": true,
+    "elapsed_time": {
+      "secs": 518,
+      "nanos": 319137200
+    },
+    "created_on": "2022-12-19T08:49:26.307739Z"
   }
 ]

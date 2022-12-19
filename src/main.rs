@@ -722,17 +722,24 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         ).split(size);
 
     let vsplit_layout = Layout::default()
-        .direction(Direction::Horizontal)
+        .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
                 Constraint::Percentage(60),
+                Constraint::Percentage(40),
             ]
         ).split(chunks[1]);
 
+    let hsplit_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(50),
+            Constraint::Percentage(50),
+        ]
+        ).split(vsplit_layout[0]);
+
     // Capture displaying variables
-    app.desc_width_char = vsplit_layout[2].width - 2;
+    app.desc_width_char = vsplit_layout[1].width - 2;
     let default_style = app.default.clone();
 
     // Render menu
@@ -852,9 +859,9 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         );
 
     f.render_widget(tabs, chunks[0]);
-    f.render_widget(task_block, vsplit_layout[0]);
-    f.render_widget(task_dur_block, vsplit_layout[1]);
-    f.render_widget(task_description, vsplit_layout[2]);
+    f.render_widget(task_block, hsplit_layout[0]);
+    f.render_widget(task_dur_block, hsplit_layout[1]);
+    f.render_widget(task_description, vsplit_layout[1]);
     f.render_widget(instructions, chunks[2]);
 }
 
