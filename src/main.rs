@@ -48,9 +48,9 @@ impl From<AppState> for usize {
     fn from(input: AppState) -> usize {
         match input {
             AppState::Display  => 0,
-            AppState::EditTask => 1,
-            AppState::Stats    => 2,
-            AppState::Settings => 3,
+            AppState::EditTask => 0,
+            AppState::Stats    => 1,
+            AppState::Settings => 2,
         }
     }
 }
@@ -680,6 +680,10 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Char('a') => app.add_task(),
                             KeyCode::Char('d') => app.del_task(),
                             KeyCode::Char('e') => app.enter_edit(EditField::Description),
+                            KeyCode::Char('h') => app.state = AppState::Settings,
+                            KeyCode::Char('l') => app.state = AppState::Settings,
+                            KeyCode::Left => app.state = AppState::Settings,
+                            KeyCode::Right => app.state = AppState::Settings,
                             _ => {}
                         }
                     },
@@ -705,8 +709,38 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                     Event::Tick => {},
                 }
             },
-            AppState::Stats => {},
-            AppState::Settings => {},
+            AppState::Stats => {
+                match rx.recv()? {
+                    Event::Input(key) => {
+                        match key.code {
+                            KeyCode::Char('q') => {app.save_to_db(); app.save_settings(); return Ok(())},
+                            KeyCode::Esc => {app.save_to_db(); app.save_settings(); return Ok(())},
+                            KeyCode::Char('h') => app.state = AppState::Display,
+                            KeyCode::Char('l') => app.state = AppState::Display,
+                            KeyCode::Left => app.state = AppState::Display,
+                            KeyCode::Right => app.state = AppState::Display,
+                            _ => {}
+                        }
+                    },
+                    Event::Tick => {},
+                }
+            },
+            AppState::Settings => {
+                match rx.recv()? {
+                    Event::Input(key) => {
+                        match key.code {
+                            KeyCode::Char('q') => {app.save_to_db(); app.save_settings(); return Ok(())},
+                            KeyCode::Esc => {app.save_to_db(); app.save_settings(); return Ok(())},
+                            KeyCode::Char('h') => app.state = AppState::Display,
+                            KeyCode::Char('l') => app.state = AppState::Display,
+                            KeyCode::Left => app.state = AppState::Display,
+                            KeyCode::Right => app.state = AppState::Display,
+                            _ => {}
+                        }
+                    },
+                    Event::Tick => {},
+                }
+            },
         }
     }
 }
@@ -737,14 +771,25 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             ].as_ref(),
         ).split(size);
 
-    let vsplit_layout = Layout::default()
+    let vsplit_layout = if app.settings.is_horizontal {
+        Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage(60),
+                Constraint::Percentage(40),
+            ]
+        ).split(chunks[1])
+    } else {
+        Layout::default()
         .direction(Direction::Vertical)
         .constraints(
             [
                 Constraint::Percentage(60),
                 Constraint::Percentage(40),
             ]
-        ).split(chunks[1]);
+        ).split(chunks[1])
+    };
 
     let hsplit_layout = Layout::default()
         .direction(Direction::Horizontal)
@@ -889,8 +934,69 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .margin(2)
         .constraints(
             [
+                Constraint::Length(3),
                 Constraint::Min(2),
                 Constraint::Length(4),
             ].as_ref(),
         ).split(size);
+
+    let vsplit_layout = if app.settings.is_horizontal {
+        Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage(60),
+                Constraint::Percentage(40),
+            ]
+        ).split(chunks[1])
+    } else {
+        Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Percentage(60),
+                Constraint::Percentage(40),
+            ]
+        ).split(chunks[1])
+    };
+
+    // Capture displaying variables
+    let default_style = app.settings.default.clone();
+
+    // Render menu
+    let menu_titles = vec!["Tasks", "Stats", "Settings"];
+    let menu = menu_titles
+        .iter()
+        .map(|t| {
+            let (first, rest) = t.split_at(1);
+            Spans::from(vec![
+                Span::styled(
+                    first,
+                    app.settings.title,
+                ),
+                Span::styled(rest, default_style),
+            ])
+        })
+        .collect();
+
+    let tabs = Tabs::new(menu)
+        .select(AppState::Settings.into())
+        .block(Block::default().title("Menu").borders(Borders::BOTTOM).border_type(BorderType::Double))
+        .style(default_style)
+        .highlight_style(app.settings.title)
+        .divider(Span::styled("|", default_style));
+
+    // Render instructions
+    let instructions = Paragraph::new("enter - edit setting   | left/right - Modify    | 'h' - Go to Stats      | 'l' - Go to Tasks")
+        .style(default_style)
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::TOP)
+                .style(default_style)
+                .border_type(BorderType::Double)
+        );
+
+    f.render_widget(tabs, chunks[0]);
+    f.render_widget(instructions, chunks[2]);
 }

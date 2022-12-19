@@ -1,7 +1,7 @@
 [
   {
     "title": "Implement deletion of tasks\n",
-    "description": "Implement the ability to delete tasks upon pressing the 'd' key. Well I may edit this task while I am doing stuff and the time should increase.",
+    "description": "Implement the ability to delete tasks upon pressing the 'd' key.",
     "is_done": true,
     "is_active": false,
     "is_selected": true,
@@ -54,8 +54,8 @@
     "is_active": true,
     "is_selected": false,
     "elapsed_time": {
-      "secs": 2479,
-      "nanos": 958975600
+      "secs": 6653,
+      "nanos": 851324200
     },
     "created_on": "2022-12-19T08:49:26.307739Z"
   },
