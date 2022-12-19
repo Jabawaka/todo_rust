@@ -1,0 +1,53 @@
+{
+  "is_horizontal": false,
+  "default": {
+    "fg": "White",
+    "bg": "Black",
+    "add_modifier": {
+      "bits": 0
+    },
+    "sub_modifier": {
+      "bits": 0
+    }
+  },
+  "highlight": {
+    "fg": "Blue",
+    "bg": "White",
+    "add_modifier": {
+      "bits": 1
+    },
+    "sub_modifier": {
+      "bits": 0
+    }
+  },
+  "active_normal": {
+    "fg": "Green",
+    "bg": "Black",
+    "add_modifier": {
+      "bits": 0
+    },
+    "sub_modifier": {
+      "bits": 0
+    }
+  },
+  "active_highlight": {
+    "fg": "Green",
+    "bg": "White",
+    "add_modifier": {
+      "bits": 1
+    },
+    "sub_modifier": {
+      "bits": 0
+    }
+  },
+  "title": {
+    "fg": "Cyan",
+    "bg": "Black",
+    "add_modifier": {
+      "bits": 1
+    },
+    "sub_modifier": {
+      "bits": 0
+    }
+  }
+}

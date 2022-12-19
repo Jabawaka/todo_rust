@@ -103,6 +103,20 @@ impl Task {
 }
 
 
+#[derive(Serialize, Deserialize)]
+struct Settings {
+    // Layout
+    is_horizontal: bool,
+
+    // Styles
+    default: Style,
+    highlight: Style,
+    active_normal: Style,
+    active_highlight: Style,
+    title: Style,
+}
+
+
 struct App {
     // App state
     db_path: String,
@@ -123,11 +137,8 @@ struct App {
     cursor_shown: bool,
     last_blink: Instant,
 
-    // Styles
-    default: Style,
-    highlight: Style,
-    active_normal: Style,
-    active_highlight: Style,
+    // Settings
+    settings: Settings,
 }
 
 impl App {
@@ -142,6 +153,9 @@ impl App {
         if parsed_tasks.len() > 0 {
             parsed_tasks[0].is_selected = true;
         }
+
+        let settings_content = fs::read_to_string("settings.json")?;
+        let settings: Settings = serde_json::from_str(&settings_content)?;
 
         Ok(App {
             db_path: path_to_db.clone(),
@@ -160,15 +174,16 @@ impl App {
             cursor_shown: false,
             last_blink: Instant::now(),
 
-            default:          Style::default().fg(Color::White).bg(Color::Black),
-            highlight:        Style::default().fg(Color::Black).bg(Color::White),
-            active_normal:    Style::default().fg(Color::Green).bg(Color::Black),
-            active_highlight: Style::default().fg(Color::Green).bg(Color::White),
+            settings: settings,
         })
     }
 
     fn save_to_db(&mut self) {
         fs::write(&self.db_path, &serde_json::to_vec_pretty(&self.tasks).expect("DB should be writeable")).expect("DB should be writeable");
+    }
+
+    fn save_settings(&mut self) {
+        fs::write("settings.json", &serde_json::to_vec_pretty(&self.settings).expect("Settings should be writeable")).expect("Settings should be writeable");
     }
 
     fn inc_sel_task(&mut self) {
@@ -653,8 +668,9 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                 match rx.recv()? {
                     Event::Input(key) => {
                         match key.code {
-                            KeyCode::Char('q') => {app.save_to_db(); return Ok(())},
-                            KeyCode::Esc => {app.save_to_db(); return Ok(())},
+                            KeyCode::Char('q') => {app.save_to_db(); app.save_settings(); return Ok(())},
+                            KeyCode::Esc => {app.save_to_db(); app.save_settings(); return Ok(())},
+                            KeyCode::Char('s') => app.save_to_db(),
                             KeyCode::Char('j') => app.inc_sel_task(),
                             KeyCode::Char('k') => app.dec_sel_task(),
                             KeyCode::Down => app.inc_sel_task(),
@@ -740,7 +756,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     // Capture displaying variables
     app.desc_width_char = vsplit_layout[1].width - 2;
-    let default_style = app.default.clone();
+    let default_style = app.settings.default.clone();
 
     // Render menu
     let menu_titles = vec!["Tasks", "Stats", "Settings"];
@@ -751,9 +767,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             Spans::from(vec![
                 Span::styled(
                     first,
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::UNDERLINED),
+                    app.settings.title,
                 ),
                 Span::styled(rest, default_style),
             ])
@@ -762,9 +776,9 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let tabs = Tabs::new(menu)
         .select(AppState::Display.into())
-        .block(Block::default().title("Menu").borders(Borders::BOTTOM))
+        .block(Block::default().title("Menu").borders(Borders::BOTTOM).border_type(BorderType::Double))
         .style(default_style)
-        .highlight_style(app.highlight)
+        .highlight_style(app.settings.title)
         .divider(Span::styled("|", default_style));
 
     // Render tasks information
@@ -779,15 +793,15 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             }
             disp_string.push_str(&task.title);
 
-            let mut style = app.default;
+            let mut style = app.settings.default;
             if task.is_selected {
                 if task.is_active {
-                    style = app.active_highlight;
+                    style = app.settings.active_highlight;
                 } else {
-                    style = app.highlight;
+                    style = app.settings.highlight;
                 }
             } else if task.is_active {
-                style = app.active_normal;
+                style = app.settings.active_normal;
             }
 
             Spans::from(vec![Span::styled(disp_string, style)])
@@ -799,15 +813,15 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let mut tasks_duration: Vec<_> = app.tasks
         .iter()
         .map(|task| {
-            let mut style = app.default;
+            let mut style = app.settings.default;
             if task.is_selected {
                 if task.is_active {
-                    style = app.active_highlight;
+                    style = app.settings.active_highlight;
                 } else {
-                    style = app.highlight;
+                    style = app.settings.highlight;
                 }
             } else if task.is_active {
-                style = app.active_normal;
+                style = app.settings.active_normal;
             }
 
             Spans::from(vec![Span::styled(task.get_time_str(), style)])
@@ -848,7 +862,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .wrap(Wrap { trim: false });
 
     // Render instructions
-    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | 'h' - Go to left tab   | 'l' - Go to right tab  \n'c' - Archive tasks     | enter - Activate task  | esc,'q' - Quit         |                        ")
+    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | 'h' - Go to left tab   | 'l' - Go to right tab  \n'c' - Archive tasks     | 's' - Save tasks       | enter - Activate task  | esc,'q' - Quit         ")
         .style(default_style)
         .alignment(Alignment::Center)
         .block(

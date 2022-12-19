@@ -4,7 +4,7 @@
     "description": "Implement the ability to delete tasks upon pressing the 'd' key. Well I may edit this task while I am doing stuff and the time should increase.",
     "is_done": true,
     "is_active": false,
-    "is_selected": false,
+    "is_selected": true,
     "elapsed_time": {
       "secs": 9,
       "nanos": 713170112
@@ -51,12 +51,36 @@
     "title": "Settings page",
     "description": "A settings page with the ability to change the colour schemes, the layout between vertical and horizontal split. Remember to put an example at the bottom of it.",
     "is_done": false,
-    "is_active": false,
-    "is_selected": true,
+    "is_active": true,
+    "is_selected": false,
     "elapsed_time": {
-      "secs": 518,
-      "nanos": 319137200
+      "secs": 2479,
+      "nanos": 958975600
     },
     "created_on": "2022-12-19T08:49:26.307739Z"
+  },
+  {
+    "title": "Coordinate style",
+    "description": "Before the settings page, it would be good to get a consistent looking style for the whole application.",
+    "is_done": true,
+    "is_active": false,
+    "is_selected": false,
+    "elapsed_time": {
+      "secs": 15,
+      "nanos": 11632800
+    },
+    "created_on": "2022-12-19T15:18:21.333923300Z"
+  },
+  {
+    "title": "Saving of settings to json",
+    "description": "The app should be able to save the settings to a json file.",
+    "is_done": true,
+    "is_active": false,
+    "is_selected": false,
+    "elapsed_time": {
+      "secs": 0,
+      "nanos": 0
+    },
+    "created_on": "2022-12-19T16:02:38.619027800Z"
   }
 ]
