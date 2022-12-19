@@ -715,7 +715,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .margin(2)
         .constraints(
             [
-                Constraint::Length(2),
+                Constraint::Length(3),
                 Constraint::Min(2),
                 Constraint::Length(4),
             ].as_ref(),
