@@ -789,8 +789,8 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Percentage(60),
-                Constraint::Percentage(40),
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
             ]
         ).split(chunks[1])
     } else {
@@ -798,8 +798,8 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Percentage(60),
-                Constraint::Percentage(40),
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
             ]
         ).split(chunks[1])
     };
@@ -958,8 +958,8 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Percentage(60),
-                Constraint::Percentage(40),
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
             ]
         ).split(chunks[1])
     } else {
@@ -967,11 +967,20 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Percentage(60),
-                Constraint::Percentage(40),
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
             ]
         ).split(chunks[1])
     };
+
+    let hsplit_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ]
+        ).split(vsplit_layout[0]);
 
     // Capture displaying variables
     let default_style = app.settings.default.clone();
@@ -999,11 +1008,46 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .highlight_style(app.settings.title)
         .divider(Span::styled("|", default_style));
 
+    // Render settings
+    let settings_sections = Paragraph::new(vec![
+        Spans::from(vec![Span::styled("Layout", app.settings.default.add_modifier(Modifier::UNDERLINED))]),
+        Spans::from(vec![Span::styled("", app.settings.default)]),
+        Spans::from(vec![Span::styled("  Split", app.settings.default)]),
+        Spans::from(vec![Span::styled("", app.settings.default)]),
+        Spans::from(vec![Span::styled("Task colours", app.settings.default.add_modifier(Modifier::UNDERLINED))]),
+        Spans::from(vec![Span::styled("", app.settings.default)]),
+
+    ])
+        .alignment(Alignment::Left)
+        .block(
+            Block::default()
+                .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
+                .style(default_style)
+        );
+
+    let settings_values = Paragraph::new(vec![
+        Spans::from(vec![Span::styled("", app.settings.default)]),
+        Spans::from(vec![Span::styled("", app.settings.default)]),
+        Spans::from(vec![Span::styled(if app.settings.is_horizontal { "Horizontal    " } else { "Vertical    " }, app.settings.default)]),
+        Spans::from(vec![Span::styled("", app.settings.default)]),
+        Spans::from(vec![Span::styled("", app.settings.default)]),
+        Spans::from(vec![Span::styled("", app.settings.default)]),
+    ])
+        .alignment(Alignment::Right)
+        .block(
+            Block::default()
+                .borders(Borders::RIGHT | Borders::TOP | Borders::BOTTOM)
+                .style(default_style)
+        );
+
     // Render example
     let example = Paragraph::new(vec![
         Spans::from(vec![Span::styled("[ ] This task is selected", app.settings.highlight)]),
+        Spans::from(vec![Span::styled("[ ] This task is none of the above, just sitting here calmly", app.settings.default)]),
+        Spans::from(vec![Span::styled("[ ] This task is none of the above, just sitting here calmly", app.settings.default)]),
         Spans::from(vec![Span::styled("[ ] This task is the active one", app.settings.active_normal)]),
-        Spans::from(vec![Span::styled("[X] This task is selected and active", app.settings.active_highlight)]),
+        Spans::from(vec![Span::styled("[ ] This task is none of the above, just sitting here calmly", app.settings.default)]),
+        Spans::from(vec![Span::styled("[X] This task is selected and active (although there can only be one active one", app.settings.active_highlight)]),
         Spans::from(vec![Span::styled("[ ] This task is none of the above, just sitting here calmly", app.settings.default)]),
     ])
         .alignment(Alignment::Left)
@@ -1011,7 +1055,7 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             Block::default()
                 .borders(Borders::ALL)
                 .style(default_style)
-                .title("Example")
+                .title(" Example ")
         );
 
     // Render instructions
@@ -1026,6 +1070,8 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         );
 
     f.render_widget(tabs, chunks[0]);
+    f.render_widget(settings_sections, hsplit_layout[0]);
+    f.render_widget(settings_values, hsplit_layout[1]);
     f.render_widget(example, vsplit_layout[1]);
     f.render_widget(instructions, chunks[2]);
 }
