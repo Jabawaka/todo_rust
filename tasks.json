@@ -50,12 +50,12 @@
   {
     "title": "Settings page",
     "description": "A settings page with the ability to change the colour schemes, the layout between vertical and horizontal split. Remember to put an example at the bottom of it.",
-    "is_done": false,
-    "is_active": true,
+    "is_done": true,
+    "is_active": false,
     "is_selected": false,
     "elapsed_time": {
-      "secs": 6653,
-      "nanos": 851324200
+      "secs": 50906,
+      "nanos": 370478200
     },
     "created_on": "2022-12-19T08:49:26.307739Z"
   },
@@ -82,5 +82,17 @@
       "nanos": 0
     },
     "created_on": "2022-12-19T16:02:38.619027800Z"
+  },
+  {
+    "title": "Stats page",
+    "description": "Let's note down here what stats might be useful and in which ways to present them.",
+    "is_done": false,
+    "is_active": false,
+    "is_selected": false,
+    "elapsed_time": {
+      "secs": 0,
+      "nanos": 0
+    },
+    "created_on": "2022-12-19T17:39:37.927755900Z"
   }
 ]

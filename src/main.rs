@@ -42,15 +42,26 @@ enum AppState {
     EditTask,
     Stats,
     Settings,
+    EditSetting,
+}
+
+#[derive(PartialEq)]
+enum EditSettingField {
+    Split,
+    Normal,
+    Highlight,
+    ActiveTask,
+
 }
 
 impl From<AppState> for usize {
     fn from(input: AppState) -> usize {
         match input {
-            AppState::Display  => 0,
-            AppState::EditTask => 0,
-            AppState::Stats    => 1,
-            AppState::Settings => 2,
+            AppState::Display     => 0,
+            AppState::EditTask    => 0,
+            AppState::Stats       => 1,
+            AppState::Settings    => 2,
+            AppState::EditSetting => 2,
         }
     }
 }
@@ -741,6 +752,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                     Event::Tick => {},
                 }
             },
+            AppState::EditSetting => {},
         }
     }
 }
@@ -752,6 +764,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         AppState::EditTask => render_tasks(f, app),
         AppState::Stats => {},
         AppState::Settings => render_settings(f, app),
+        AppState::EditSetting => render_settings(f, app),
     }
 }
 
@@ -765,7 +778,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .margin(2)
         .constraints(
             [
-                Constraint::Length(3),
+                Constraint::Length(2),
                 Constraint::Min(2),
                 Constraint::Length(4),
             ].as_ref(),
@@ -821,7 +834,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let tabs = Tabs::new(menu)
         .select(AppState::Display.into())
-        .block(Block::default().title("Menu").borders(Borders::BOTTOM).border_type(BorderType::Double))
+        .block(Block::default().borders(Borders::BOTTOM).border_type(BorderType::Double))
         .style(default_style)
         .highlight_style(app.settings.title)
         .divider(Span::styled("|", default_style));
@@ -934,7 +947,7 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .margin(2)
         .constraints(
             [
-                Constraint::Length(3),
+                Constraint::Length(2),
                 Constraint::Min(2),
                 Constraint::Length(4),
             ].as_ref(),
@@ -981,10 +994,25 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let tabs = Tabs::new(menu)
         .select(AppState::Settings.into())
-        .block(Block::default().title("Menu").borders(Borders::BOTTOM).border_type(BorderType::Double))
+        .block(Block::default().borders(Borders::BOTTOM).border_type(BorderType::Double))
         .style(default_style)
         .highlight_style(app.settings.title)
         .divider(Span::styled("|", default_style));
+
+    // Render example
+    let example = Paragraph::new(vec![
+        Spans::from(vec![Span::styled("[ ] This task is selected", app.settings.highlight)]),
+        Spans::from(vec![Span::styled("[ ] This task is the active one", app.settings.active_normal)]),
+        Spans::from(vec![Span::styled("[X] This task is selected and active", app.settings.active_highlight)]),
+        Spans::from(vec![Span::styled("[ ] This task is none of the above, just sitting here calmly", app.settings.default)]),
+    ])
+        .alignment(Alignment::Left)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .style(default_style)
+                .title("Example")
+        );
 
     // Render instructions
     let instructions = Paragraph::new("enter - edit setting   | left/right - Modify    | 'h' - Go to Stats      | 'l' - Go to Tasks")
@@ -998,5 +1026,6 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         );
 
     f.render_widget(tabs, chunks[0]);
+    f.render_widget(example, vsplit_layout[1]);
     f.render_widget(instructions, chunks[2]);
 }
