@@ -48,10 +48,12 @@ enum AppState {
 #[derive(PartialEq)]
 enum EditSettingField {
     Split,
-    Normal,
-    Highlight,
-    ActiveTask,
-
+    NormalFg,
+    NormalBg,
+    SelectionFg,
+    SelectionBg,
+    Active,
+    Title
 }
 
 impl From<AppState> for usize {
@@ -125,6 +127,25 @@ struct Settings {
     active_normal: Style,
     active_highlight: Style,
     title: Style,
+
+    // Colours for changing
+    normal_fg_colour: Color,
+    normal_bg_colour: Color,
+    select_fg_colour: Color,
+    select_bg_colour: Color,
+    active_fg_colour: Color,
+    title_fg_colour: Color,
+}
+
+fn colour_to_string(colour: Color) -> String {
+    match colour {
+        Color::White => String::from("White"),
+        Color::Black => String::from("Black"),
+        Color::Cyan => String::from("Cyan"),
+        Color::Green => String::from("Green"),
+        Color::Blue => String::from("Blue"),
+        _ => String::from("Unknown"),
+    }
 }
 
 
@@ -135,6 +156,7 @@ struct App {
     tasks: Vec<Task>,
     state: AppState,
     edit_field: EditField,
+    edit_setting: EditSettingField,
 
     // Displaying variables
     desc_width_char: u16,
@@ -174,6 +196,7 @@ impl App {
             tasks: parsed_tasks.to_owned(),
             state: AppState::Display,
             edit_field: EditField::Description,
+            edit_setting: EditSettingField::Split,
 
             desc_width_char: 0,
 
@@ -587,6 +610,30 @@ impl App {
             index += 1;
         }
     }
+
+    fn inc_setting_selection(&mut self) {
+        match self.edit_setting {
+            EditSettingField::Split => self.edit_setting = EditSettingField::NormalFg,
+            EditSettingField::NormalFg => self.edit_setting = EditSettingField::NormalBg,
+            EditSettingField::NormalBg => self.edit_setting = EditSettingField::SelectionFg,
+            EditSettingField::SelectionFg => self.edit_setting = EditSettingField::SelectionBg,
+            EditSettingField::SelectionBg => self.edit_setting = EditSettingField::Active,
+            EditSettingField::Active => self.edit_setting = EditSettingField::Title,
+            _ => {},
+        }
+    }
+
+    fn dec_setting_selection(&mut self) {
+        match self.edit_setting {
+            EditSettingField::NormalFg => self.edit_setting = EditSettingField::Split,
+            EditSettingField::NormalBg => self.edit_setting = EditSettingField::NormalFg,
+            EditSettingField::SelectionFg => self.edit_setting = EditSettingField::NormalBg,
+            EditSettingField::SelectionBg => self.edit_setting = EditSettingField::SelectionFg,
+            EditSettingField::Active => self.edit_setting = EditSettingField::SelectionBg,
+            EditSettingField::Title => self.edit_setting = EditSettingField::Active,
+            _ => {},
+        }
+    }
 }
 
 
@@ -746,6 +793,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Char('l') => app.state = AppState::Display,
                             KeyCode::Left => app.state = AppState::Display,
                             KeyCode::Right => app.state = AppState::Display,
+                            KeyCode::Up => app.dec_setting_selection(),
+                            KeyCode::Down => app.inc_setting_selection(),
                             _ => {}
                         }
                     },
@@ -1012,11 +1061,51 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let settings_sections = Paragraph::new(vec![
         Spans::from(vec![Span::styled("Layout", app.settings.default.add_modifier(Modifier::UNDERLINED))]),
         Spans::from(vec![Span::styled("", app.settings.default)]),
-        Spans::from(vec![Span::styled("  Split", app.settings.default)]),
+        Spans::from(vec![
+            Span::styled("  ", app.settings.default),
+            Span::styled(
+                "Split",
+                if app.edit_setting == EditSettingField::Split { app.settings.highlight } else { app.settings.default }
+            )]),
         Spans::from(vec![Span::styled("", app.settings.default)]),
         Spans::from(vec![Span::styled("Task colours", app.settings.default.add_modifier(Modifier::UNDERLINED))]),
         Spans::from(vec![Span::styled("", app.settings.default)]),
-
+        Spans::from(vec![
+            Span::styled("  ", app.settings.default),
+            Span::styled(
+                "Main foreground colour",
+                if app.edit_setting == EditSettingField::NormalFg { app.settings.highlight } else { app.settings.default }
+            )]),
+        Spans::from(vec![
+            Span::styled("  ", app.settings.default),
+            Span::styled(
+                "Main background colour",
+                if app.edit_setting == EditSettingField::NormalBg { app.settings.highlight } else { app.settings.default }
+            )]),
+        Spans::from(vec![
+            Span::styled("  ", app.settings.default),
+            Span::styled(
+                "Selected foreground colour",
+                if app.edit_setting == EditSettingField::SelectionFg { app.settings.highlight } else { app.settings.default }
+            )]),
+        Spans::from(vec![
+            Span::styled("  ", app.settings.default),
+            Span::styled(
+                "Selected background colour",
+                if app.edit_setting == EditSettingField::SelectionBg { app.settings.highlight } else { app.settings.default }
+            )]),
+        Spans::from(vec![
+            Span::styled("  ", app.settings.default),
+            Span::styled(
+                "Active task colour",
+                if app.edit_setting == EditSettingField::Active { app.settings.highlight } else { app.settings.default }
+            )]),
+        Spans::from(vec![
+            Span::styled("  ", app.settings.default),
+            Span::styled(
+                "Title colour",
+                if app.edit_setting == EditSettingField::Title { app.settings.highlight } else { app.settings.default }
+            )]),
     ])
         .alignment(Alignment::Left)
         .block(
@@ -1028,10 +1117,38 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let settings_values = Paragraph::new(vec![
         Spans::from(vec![Span::styled("", app.settings.default)]),
         Spans::from(vec![Span::styled("", app.settings.default)]),
-        Spans::from(vec![Span::styled(if app.settings.is_horizontal { "Horizontal    " } else { "Vertical    " }, app.settings.default)]),
+        Spans::from(vec![
+            Span::styled(
+                if app.settings.is_horizontal { "Horizontal" } else { "Vertical" },
+                if app.edit_setting == EditSettingField::Split { app.settings.highlight } else { app.settings.default }),
+            Span::styled("    ", app.settings.default)]),
         Spans::from(vec![Span::styled("", app.settings.default)]),
         Spans::from(vec![Span::styled("", app.settings.default)]),
         Spans::from(vec![Span::styled("", app.settings.default)]),
+        Spans::from(vec![
+            Span::styled(colour_to_string(app.settings.normal_fg_colour),
+            if app.edit_setting == EditSettingField::NormalFg { app.settings.highlight } else { app.settings.default }),
+            Span::styled("    ", app.settings.default)]),
+        Spans::from(vec![
+            Span::styled(colour_to_string(app.settings.normal_bg_colour),
+            if app.edit_setting == EditSettingField::NormalBg { app.settings.highlight } else { app.settings.default }),
+            Span::styled("    ", app.settings.default)]),
+        Spans::from(vec![
+            Span::styled(colour_to_string(app.settings.select_fg_colour),
+            if app.edit_setting == EditSettingField::SelectionFg { app.settings.highlight } else { app.settings.default }),
+            Span::styled("    ", app.settings.default)]),
+        Spans::from(vec![
+            Span::styled(colour_to_string(app.settings.select_bg_colour),
+            if app.edit_setting == EditSettingField::SelectionBg { app.settings.highlight } else { app.settings.default }),
+            Span::styled("    ", app.settings.default)]),
+        Spans::from(vec![
+            Span::styled(colour_to_string(app.settings.active_fg_colour),
+            if app.edit_setting == EditSettingField::Active { app.settings.highlight } else { app.settings.default }),
+            Span::styled("    ", app.settings.default)]),
+        Spans::from(vec![
+            Span::styled(colour_to_string(app.settings.title_fg_colour),
+            if app.edit_setting == EditSettingField::Title { app.settings.highlight } else { app.settings.default }),
+            Span::styled("    ", app.settings.default)]),
     ])
         .alignment(Alignment::Right)
         .block(

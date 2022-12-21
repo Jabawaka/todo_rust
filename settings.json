@@ -14,7 +14,7 @@
     "fg": "Blue",
     "bg": "White",
     "add_modifier": {
-      "bits": 1
+      "bits": 0
     },
     "sub_modifier": {
       "bits": 0
@@ -34,7 +34,7 @@
     "fg": "Green",
     "bg": "White",
     "add_modifier": {
-      "bits": 1
+      "bits": 0
     },
     "sub_modifier": {
       "bits": 0
@@ -44,10 +44,16 @@
     "fg": "Cyan",
     "bg": "Black",
     "add_modifier": {
-      "bits": 1
+      "bits": 0
     },
     "sub_modifier": {
       "bits": 0
     }
-  }
+  },
+  "normal_fg_colour": "White",
+  "normal_bg_colour": "Black",
+  "select_fg_colour": "Blue",
+  "select_bg_colour": "White",
+  "active_fg_colour": "Green",
+  "title_fg_colour": "Cyan"
 }
