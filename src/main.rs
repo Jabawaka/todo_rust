@@ -738,10 +738,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Char('a') => app.add_task(),
                             KeyCode::Char('d') => app.del_task(),
                             KeyCode::Char('e') => app.enter_edit(EditField::Description),
-                            KeyCode::Char('h') => app.state = AppState::Settings,
-                            KeyCode::Char('l') => app.state = AppState::Settings,
-                            KeyCode::Left => app.state = AppState::Settings,
-                            KeyCode::Right => app.state = AppState::Settings,
+                            KeyCode::Tab => app.state = AppState::Stats,
+                            KeyCode::BackTab => app.state = AppState::Settings,
                             _ => {}
                         }
                     },
@@ -773,10 +771,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                         match key.code {
                             KeyCode::Char('q') => {app.save_to_db(); app.save_settings(); return Ok(())},
                             KeyCode::Esc => {app.save_to_db(); app.save_settings(); return Ok(())},
-                            KeyCode::Char('h') => app.state = AppState::Display,
-                            KeyCode::Char('l') => app.state = AppState::Display,
-                            KeyCode::Left => app.state = AppState::Display,
-                            KeyCode::Right => app.state = AppState::Display,
+                            KeyCode::Tab => app.state = AppState::Settings,
+                            KeyCode::BackTab => app.state = AppState::Display,
                             _ => {}
                         }
                     },
@@ -791,10 +787,10 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Esc => {app.save_to_db(); app.save_settings(); return Ok(())},
                             KeyCode::Char('h') => app.state = AppState::Display,
                             KeyCode::Char('l') => app.state = AppState::Display,
-                            KeyCode::Left => app.state = AppState::Display,
-                            KeyCode::Right => app.state = AppState::Display,
                             KeyCode::Up => app.dec_setting_selection(),
                             KeyCode::Down => app.inc_setting_selection(),
+                            KeyCode::Tab => app.state = AppState::Display,
+                            KeyCode::BackTab => app.state = AppState::Stats,
                             _ => {}
                         }
                     },
