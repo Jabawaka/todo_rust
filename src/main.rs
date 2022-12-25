@@ -40,7 +40,7 @@ enum Event<I> {
 enum AppState {
     Display,
     EditTask,
-    Stats,
+    Archived,
     Settings,
 }
 
@@ -52,7 +52,8 @@ enum EditSettingField {
     SelectionFg,
     SelectionBg,
     Active,
-    Title
+    Title,
+    Border,
 }
 
 impl From<AppState> for usize {
@@ -60,7 +61,7 @@ impl From<AppState> for usize {
         match input {
             AppState::Display     => 0,
             AppState::EditTask    => 0,
-            AppState::Stats       => 1,
+            AppState::Archived    => 1,
             AppState::Settings    => 2,
         }
     }
@@ -125,6 +126,7 @@ struct Settings {
     active_normal: Style,
     active_highlight: Style,
     title: Style,
+    border: Style,
 
     // Colours for changing
     normal_fg_colour: Color,
@@ -133,6 +135,7 @@ struct Settings {
     select_bg_colour: Color,
     active_fg_colour: Color,
     title_fg_colour: Color,
+    border_colour: Color,
 }
 
 impl Settings {
@@ -142,36 +145,37 @@ impl Settings {
         self.active_normal = Style::default().fg(self.active_fg_colour).bg(self.normal_bg_colour);
         self.active_highlight = Style::default().fg(self.active_fg_colour).bg(self.select_bg_colour);
         self.title = Style::default().fg(self.title_fg_colour).bg(self.normal_bg_colour);
+        self.border = Style::default().fg(self.border_colour).bg(self.normal_bg_colour);
     }
 }
 
 fn colour_to_string(colour: Color) -> String {
     match colour {
-        Color::White => String::from("White"),
-        Color::Cyan => String::from("Cyan"),
-        Color::Red => String::from("Red"),
-        Color::Green => String::from("Green"),
-        Color::Blue => String::from("Blue"),
-        Color::Yellow => String::from("Yellow"),
-        Color::Gray => String::from("Gray"),
+        Color::White    => String::from("White"),
+        Color::Cyan     => String::from("Cyan"),
+        Color::Red      => String::from("Red"),
+        Color::Green    => String::from("Green"),
+        Color::Blue     => String::from("Blue"),
+        Color::Yellow   => String::from("Yellow"),
+        Color::Gray     => String::from("Gray"),
         Color::DarkGray => String::from("Dark gray"),
-        Color::Black => String::from("Black"),
-        _ => String::from("Unknown"),
+        Color::Black    => String::from("Black"),
+        _               => String::from("Unknown"),
     }
 }
 
 fn next_colour(colour: Color) -> Color {
     match colour {
-        Color::White => Color::Cyan,
-        Color::Cyan => Color::Red,
-        Color::Red => Color::Green,
-        Color::Green => Color::Blue,
-        Color::Blue => Color::Yellow,
-        Color::Yellow => Color::Gray,
-        Color::Gray => Color::DarkGray,
+        Color::White    => Color::Cyan,
+        Color::Cyan     => Color::Red,
+        Color::Red      => Color::Green,
+        Color::Green    => Color::Blue,
+        Color::Blue     => Color::Yellow,
+        Color::Yellow   => Color::Gray,
+        Color::Gray     => Color::DarkGray,
         Color::DarkGray => Color::Black,
-        Color::Black => Color::White,
-        _ => Color::Reset,
+        Color::Black    => Color::White,
+        _               => Color::Reset,
     }
 }
 
@@ -661,6 +665,7 @@ impl App {
             EditSettingField::SelectionFg => self.edit_setting = EditSettingField::SelectionBg,
             EditSettingField::SelectionBg => self.edit_setting = EditSettingField::Active,
             EditSettingField::Active => self.edit_setting = EditSettingField::Title,
+            EditSettingField::Title => self.edit_setting = EditSettingField::Border,
             _ => {},
         }
     }
@@ -673,6 +678,7 @@ impl App {
             EditSettingField::SelectionBg => self.edit_setting = EditSettingField::SelectionFg,
             EditSettingField::Active => self.edit_setting = EditSettingField::SelectionBg,
             EditSettingField::Title => self.edit_setting = EditSettingField::Active,
+            EditSettingField::Border => self.edit_setting = EditSettingField::Title,
             _ => {},
         }
     }
@@ -686,7 +692,7 @@ impl App {
             EditSettingField::SelectionBg => {self.settings.select_bg_colour = next_colour(self.settings.select_bg_colour); self.settings.set_colours()},
             EditSettingField::Active => {self.settings.active_fg_colour = next_colour(self.settings.active_fg_colour); self.settings.set_colours()},
             EditSettingField::Title => {self.settings.title_fg_colour = next_colour(self.settings.title_fg_colour); self.settings.set_colours()},
-            _ => {}
+            EditSettingField::Border => {self.settings.border_colour = next_colour(self.settings.border_colour); self.settings.set_colours()},
         }
     }
 
@@ -699,7 +705,7 @@ impl App {
             EditSettingField::SelectionBg => {self.settings.select_bg_colour = prev_colour(self.settings.select_bg_colour); self.settings.set_colours()},
             EditSettingField::Active => {self.settings.active_fg_colour = prev_colour(self.settings.active_fg_colour); self.settings.set_colours()},
             EditSettingField::Title => {self.settings.title_fg_colour = prev_colour(self.settings.title_fg_colour); self.settings.set_colours()},
-            _ => {}
+            EditSettingField::Border => {self.settings.border_colour = prev_colour(self.settings.border_colour); self.settings.set_colours()},
         }
     }
 }
@@ -806,7 +812,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Char('a') => app.add_task(),
                             KeyCode::Char('d') => app.del_task(),
                             KeyCode::Char('e') => app.enter_edit(EditField::Description),
-                            KeyCode::Tab => app.state = AppState::Stats,
+                            KeyCode::Tab => app.state = AppState::Archived,
                             KeyCode::BackTab => app.state = AppState::Settings,
                             _ => {}
                         }
@@ -833,7 +839,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                     Event::Tick => {},
                 }
             },
-            AppState::Stats => {
+            AppState::Archived => {
                 match rx.recv()? {
                     Event::Input(key) => {
                         match key.code {
@@ -860,7 +866,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Right => app.inc_setting(),
                             KeyCode::Left => app.dec_setting(),
                             KeyCode::Tab => app.state = AppState::Display,
-                            KeyCode::BackTab => app.state = AppState::Stats,
+                            KeyCode::BackTab => app.state = AppState::Archived,
                             _ => {}
                         }
                     },
@@ -876,7 +882,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     match app.state {
         AppState::Display => render_tasks(f, app),
         AppState::EditTask => render_tasks(f, app),
-        AppState::Stats => {},
+        AppState::Archived => render_archived(f, app),
         AppState::Settings => render_settings(f, app),
     }
 }
@@ -928,9 +934,10 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     // Capture displaying variables
     app.desc_width_char = vsplit_layout[1].width - 2;
     let default_style = app.settings.default.clone();
+    let border_style = app.settings.border.clone();
 
     // Render menu
-    let menu_titles = vec!["Tasks", "Stats", "Settings"];
+    let menu_titles = vec!["Active tasks", "Archived tasks", "Settings"];
     let menu = menu_titles
         .iter()
         .map(|t| {
@@ -947,7 +954,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let tabs = Tabs::new(menu)
         .select(AppState::Display.into())
-        .block(Block::default().borders(Borders::BOTTOM).border_type(BorderType::Double))
+        .block(Block::default().borders(Borders::BOTTOM).border_type(BorderType::Double).style(border_style))
         .style(default_style)
         .highlight_style(app.settings.title)
         .divider(Span::styled("|", default_style));
@@ -1006,7 +1013,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .block(
             Block::default()
             .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
-            .style(default_style)
+            .style(border_style)
             .title(" To Do ")
         );
 
@@ -1015,7 +1022,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .block(
             Block::default()
             .borders(Borders::RIGHT | Borders::TOP | Borders::BOTTOM)
-            .style(default_style)
+            .style(border_style)
         );
 
     let mut task_title = String::from(" ");
@@ -1027,19 +1034,189 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .block(
             Block::default()
             .borders(Borders::ALL)
-            .style(default_style)
+            .style(border_style)
             .title(task_title)
         )
         .wrap(Wrap { trim: false });
 
     // Render instructions
-    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | Tab - Stats            | Shift+Tab - Settings  \n'c' - Archive tasks     | 's' - Save tasks       | enter - Activate task  | esc,'q' - Quit         ")
+    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | Tab - Archive          | Shift+Tab - Settings  \n'c' - Archive tasks     | 's' - Save tasks       | enter - Activate task  | esc,'q' - Quit         ")
         .style(default_style)
         .alignment(Alignment::Center)
         .block(
             Block::default()
                 .borders(Borders::TOP)
-                .style(default_style)
+                .style(border_style)
+                .border_type(BorderType::Double)
+        );
+
+    f.render_widget(tabs, chunks[0]);
+    f.render_widget(task_block, hsplit_layout[0]);
+    f.render_widget(task_dur_block, hsplit_layout[1]);
+    f.render_widget(task_description, vsplit_layout[1]);
+    f.render_widget(instructions, chunks[2]);
+}
+
+
+// Render tasks screen
+fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+    let size = f.size();
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(2)
+        .constraints(
+            [
+                Constraint::Length(2),
+                Constraint::Min(2),
+                Constraint::Length(4),
+            ].as_ref(),
+        ).split(size);
+
+    let vsplit_layout = if app.settings.is_horizontal {
+        Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ]
+        ).split(chunks[1])
+    } else {
+        Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ]
+        ).split(chunks[1])
+    };
+
+    let hsplit_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(50),
+            Constraint::Percentage(50),
+        ]
+        ).split(vsplit_layout[0]);
+
+    // Capture displaying variables
+    app.desc_width_char = vsplit_layout[1].width - 2;
+    let default_style = app.settings.default.clone();
+    let border_style = app.settings.border.clone();
+
+    // Render menu
+    let menu_titles = vec!["Active tasks", "Archived tasks", "Settings"];
+    let menu = menu_titles
+        .iter()
+        .map(|t| {
+            let (first, rest) = t.split_at(1);
+            Spans::from(vec![
+                Span::styled(
+                    first,
+                    app.settings.title,
+                ),
+                Span::styled(rest, default_style),
+            ])
+        })
+        .collect();
+
+    let tabs = Tabs::new(menu)
+        .select(AppState::Archived.into())
+        .block(Block::default().borders(Borders::BOTTOM).border_type(BorderType::Double).style(border_style))
+        .style(default_style)
+        .highlight_style(app.settings.title)
+        .divider(Span::styled("|", default_style));
+
+    // Render tasks information
+    let mut tasks: Vec<_> = app.tasks
+        .iter()
+        .map(|task| {
+            let mut disp_string = String::from("");
+            if task.is_done {
+                disp_string.push_str("[X] ");
+            } else {
+                disp_string.push_str("[ ] ");
+            }
+            disp_string.push_str(&task.title);
+
+            let mut style = app.settings.default;
+            if task.is_selected {
+                if task.is_active {
+                    style = app.settings.active_highlight;
+                } else {
+                    style = app.settings.highlight;
+                }
+            } else if task.is_active {
+                style = app.settings.active_normal;
+            }
+
+            Spans::from(vec![Span::styled(disp_string, style)])
+        })
+        .collect();
+
+    tasks.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
+
+    let mut tasks_duration: Vec<_> = app.tasks
+        .iter()
+        .map(|task| {
+            let mut style = app.settings.default;
+            if task.is_selected {
+                if task.is_active {
+                    style = app.settings.active_highlight;
+                } else {
+                    style = app.settings.highlight;
+                }
+            } else if task.is_active {
+                style = app.settings.active_normal;
+            }
+
+            Spans::from(vec![Span::styled(task.get_time_str(), style)])
+        })
+        .collect();
+
+    tasks_duration.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
+
+    let task_block = Paragraph::new(tasks)
+        .alignment(Alignment::Left)
+        .block(
+            Block::default()
+            .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
+            .style(border_style)
+            .title(" Archive ")
+        );
+
+    let task_dur_block = Paragraph::new(tasks_duration)
+        .alignment(Alignment::Right)
+        .block(
+            Block::default()
+            .borders(Borders::RIGHT | Borders::TOP | Borders::BOTTOM)
+            .style(border_style)
+        );
+
+    let mut task_title = String::from(" ");
+    task_title.push_str(&app.get_sel_task_title().unwrap_or_else(|| { String::from("") }));
+    task_title.push_str(" ");
+
+    let task_description = Paragraph::new(app.get_sel_task_info().unwrap_or_else(|| { vec![Spans::from(vec![Span::raw("")])] }))
+        .alignment(Alignment::Left)
+        .block(
+            Block::default()
+            .borders(Borders::ALL)
+            .style(border_style)
+            .title(task_title)
+        )
+        .wrap(Wrap { trim: false });
+
+    // Render instructions
+    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | Tab - Archive          | Shift+Tab - Settings  \n'c' - Archive tasks     | 's' - Save tasks       | enter - Activate task  | esc,'q' - Quit         ")
+        .style(default_style)
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::TOP)
+                .style(border_style)
                 .border_type(BorderType::Double)
         );
 
@@ -1097,9 +1274,10 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     // Capture displaying variables
     let default_style = app.settings.default.clone();
+    let border_style = app.settings.border.clone();
 
     // Render menu
-    let menu_titles = vec!["Tasks", "Stats", "Settings"];
+    let menu_titles = vec!["Active tasks", "Archived tasks", "Settings"];
     let menu = menu_titles
         .iter()
         .map(|t| {
@@ -1116,7 +1294,7 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let tabs = Tabs::new(menu)
         .select(AppState::Settings.into())
-        .block(Block::default().borders(Borders::BOTTOM).border_type(BorderType::Double))
+        .block(Block::default().borders(Borders::BOTTOM).border_type(BorderType::Double).style(border_style))
         .style(default_style)
         .highlight_style(app.settings.title)
         .divider(Span::styled("|", default_style));
@@ -1170,12 +1348,18 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 "Title colour",
                 if app.edit_setting == EditSettingField::Title { app.settings.highlight } else { app.settings.default }
             )]),
+        Spans::from(vec![
+            Span::styled("  ", app.settings.default),
+            Span::styled(
+                "Border colour",
+                if app.edit_setting == EditSettingField::Border { app.settings.highlight } else { app.settings.default }
+            )]),
     ])
         .alignment(Alignment::Left)
         .block(
             Block::default()
                 .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
-                .style(default_style)
+                .border_style(border_style)
         );
 
     let settings_values = Paragraph::new(vec![
@@ -1213,16 +1397,21 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             Span::styled(colour_to_string(app.settings.title_fg_colour),
             if app.edit_setting == EditSettingField::Title { app.settings.highlight } else { app.settings.default }),
             Span::styled("    ", app.settings.default)]),
+        Spans::from(vec![
+            Span::styled(colour_to_string(app.settings.border_colour),
+            if app.edit_setting == EditSettingField::Border { app.settings.highlight } else { app.settings.default }),
+            Span::styled("    ", app.settings.default)]),
     ])
         .alignment(Alignment::Right)
         .block(
             Block::default()
                 .borders(Borders::RIGHT | Borders::TOP | Borders::BOTTOM)
-                .style(default_style)
+                .style(border_style)
         );
 
     // Render example
     let example = Paragraph::new(vec![
+        Spans::from(vec![Span::styled("", app.settings.default)]),
         Spans::from(vec![Span::styled("[ ] This task is selected", app.settings.highlight)]),
         Spans::from(vec![Span::styled("[ ] This task is none of the above, just sitting here calmly", app.settings.default)]),
         Spans::from(vec![Span::styled("[ ] This task is none of the above, just sitting here calmly", app.settings.default)]),
@@ -1235,18 +1424,18 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .style(default_style)
+                .style(border_style)
                 .title(" Example ")
         );
 
     // Render instructions
-    let instructions = Paragraph::new("Up/Down - Select       | Left/Right - Modify    | Tab - Stats            | Shift+Tab - Tasks      ")
+    let instructions = Paragraph::new("Up/Down - Select       | Left/Right - Modify    | Tab - Archive          | Shift+Tab - Tasks      ")
         .style(default_style)
         .alignment(Alignment::Center)
         .block(
             Block::default()
                 .borders(Borders::TOP)
-                .style(default_style)
+                .style(border_style)
                 .border_type(BorderType::Double)
         );
 

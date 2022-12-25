@@ -4,7 +4,7 @@
     "description": "Implement the ability to delete tasks upon pressing the 'd' key.",
     "is_done": true,
     "is_active": false,
-    "is_selected": true,
+    "is_selected": false,
     "elapsed_time": {
       "secs": 9,
       "nanos": 713170112
@@ -16,7 +16,7 @@
     "description": "Implement all normal cursor behaviour:\n - Going back and forward through the command line.\n - Going up and down lines.\n - At end/beginning of lines, go to the end/beginning of line.",
     "is_done": true,
     "is_active": false,
-    "is_selected": false,
+    "is_selected": true,
     "elapsed_time": {
       "secs": 3,
       "nanos": 749001041
@@ -25,13 +25,13 @@
   },
   {
     "title": "Implement closure of tasks",
-    "description": "Upon pressing the 'c' key, the tasks marked as done shall disappear from the list.",
+    "description": "Upon pressing the 'c' key, the tasks marked as done shall disappear from the list. They should be added to the archived tasks page.",
     "is_done": false,
-    "is_active": false,
+    "is_active": true,
     "is_selected": false,
     "elapsed_time": {
-      "secs": 450,
-      "nanos": 448251140
+      "secs": 524,
+      "nanos": 659630865
     },
     "created_on": "2022-12-18T20:39:04.050892Z"
   },
@@ -42,8 +42,8 @@
     "is_active": false,
     "is_selected": false,
     "elapsed_time": {
-      "secs": 0,
-      "nanos": 0
+      "secs": 99,
+      "nanos": 927698789
     },
     "created_on": "2022-12-19T08:47:46.797634100Z"
   },
@@ -84,8 +84,8 @@
     "created_on": "2022-12-19T16:02:38.619027800Z"
   },
   {
-    "title": "Stats page",
-    "description": "Let's note down here what stats might be useful and in which ways to present them.",
+    "title": "Archived tasks",
+    "description": "Display a page with the archived tasks, with a title indicating the date upon which it was archived.\t",
     "is_done": false,
     "is_active": false,
     "is_selected": false,
@@ -93,6 +93,30 @@
       "secs": 0,
       "nanos": 0
     },
-    "created_on": "2022-12-19T17:39:37.927755900Z"
+    "created_on": "2022-12-25T06:56:57.717862Z"
+  },
+  {
+    "title": "Reopen tasks",
+    "description": "Add the ability to open tasks again from the archived tasks page. They should be removed from the archive.",
+    "is_done": false,
+    "is_active": false,
+    "is_selected": false,
+    "elapsed_time": {
+      "secs": 0,
+      "nanos": 0
+    },
+    "created_on": "2022-12-25T06:57:30.342879Z"
+  },
+  {
+    "title": "Capability to reorder tasks in the active tasks page",
+    "description": "n/a",
+    "is_done": false,
+    "is_active": false,
+    "is_selected": false,
+    "elapsed_time": {
+      "secs": 0,
+      "nanos": 0
+    },
+    "created_on": "2022-12-25T06:59:14.588001Z"
   }
 ]
