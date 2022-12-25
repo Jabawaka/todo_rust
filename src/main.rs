@@ -1033,7 +1033,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .wrap(Wrap { trim: false });
 
     // Render instructions
-    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | 'h' - Go to left tab   | 'l' - Go to right tab  \n'c' - Archive tasks     | 's' - Save tasks       | enter - Activate task  | esc,'q' - Quit         ")
+    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | Tab - Stats            | Shift+Tab - Settings  \n'c' - Archive tasks     | 's' - Save tasks       | enter - Activate task  | esc,'q' - Quit         ")
         .style(default_style)
         .alignment(Alignment::Center)
         .block(
@@ -1240,7 +1240,7 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         );
 
     // Render instructions
-    let instructions = Paragraph::new("enter - edit setting   | left/right - Modify    | 'h' - Go to Stats      | 'l' - Go to Tasks")
+    let instructions = Paragraph::new("Up/Down - Select       | Left/Right - Modify    | Tab - Stats            | Shift+Tab - Tasks      ")
         .style(default_style)
         .alignment(Alignment::Center)
         .block(
