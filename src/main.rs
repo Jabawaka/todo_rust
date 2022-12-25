@@ -42,7 +42,6 @@ enum AppState {
     EditTask,
     Stats,
     Settings,
-    EditSetting,
 }
 
 #[derive(PartialEq)]
@@ -63,7 +62,6 @@ impl From<AppState> for usize {
             AppState::EditTask    => 0,
             AppState::Stats       => 1,
             AppState::Settings    => 2,
-            AppState::EditSetting => 2,
         }
     }
 }
@@ -137,14 +135,58 @@ struct Settings {
     title_fg_colour: Color,
 }
 
+impl Settings {
+    fn set_colours(&mut self) {
+        self.default = Style::default().fg(self.normal_fg_colour).bg(self.normal_bg_colour);
+        self.highlight = Style::default().fg(self.select_fg_colour).bg(self.select_bg_colour);
+        self.active_normal = Style::default().fg(self.active_fg_colour).bg(self.normal_bg_colour);
+        self.active_highlight = Style::default().fg(self.active_fg_colour).bg(self.select_bg_colour);
+        self.title = Style::default().fg(self.title_fg_colour).bg(self.normal_bg_colour);
+    }
+}
+
 fn colour_to_string(colour: Color) -> String {
     match colour {
         Color::White => String::from("White"),
-        Color::Black => String::from("Black"),
         Color::Cyan => String::from("Cyan"),
+        Color::Red => String::from("Red"),
         Color::Green => String::from("Green"),
         Color::Blue => String::from("Blue"),
+        Color::Yellow => String::from("Yellow"),
+        Color::Gray => String::from("Gray"),
+        Color::DarkGray => String::from("Dark gray"),
+        Color::Black => String::from("Black"),
         _ => String::from("Unknown"),
+    }
+}
+
+fn next_colour(colour: Color) -> Color {
+    match colour {
+        Color::White => Color::Cyan,
+        Color::Cyan => Color::Red,
+        Color::Red => Color::Green,
+        Color::Green => Color::Blue,
+        Color::Blue => Color::Yellow,
+        Color::Yellow => Color::Gray,
+        Color::Gray => Color::DarkGray,
+        Color::DarkGray => Color::Black,
+        Color::Black => Color::White,
+        _ => Color::Reset,
+    }
+}
+
+fn prev_colour(colour: Color) -> Color {
+    match colour {
+        Color::White => Color::Black,
+        Color::Cyan => Color::White,
+        Color::Red => Color::Cyan,
+        Color::Green => Color::Red,
+        Color::Blue => Color::Green,
+        Color::Yellow => Color::Blue,
+        Color::Gray => Color::Yellow,
+        Color::DarkGray => Color::Gray,
+        Color::Black => Color::DarkGray,
+        _ => Color::Reset,
     }
 }
 
@@ -634,6 +676,32 @@ impl App {
             _ => {},
         }
     }
+
+    fn inc_setting(&mut self) {
+        match self.edit_setting {
+            EditSettingField::Split => self.settings.is_horizontal = !self.settings.is_horizontal,
+            EditSettingField::NormalFg => {self.settings.normal_fg_colour = next_colour(self.settings.normal_fg_colour); self.settings.set_colours()},
+            EditSettingField::NormalBg => {self.settings.normal_bg_colour = next_colour(self.settings.normal_bg_colour); self.settings.set_colours()},
+            EditSettingField::SelectionFg => {self.settings.select_fg_colour = next_colour(self.settings.select_fg_colour); self.settings.set_colours()},
+            EditSettingField::SelectionBg => {self.settings.select_bg_colour = next_colour(self.settings.select_bg_colour); self.settings.set_colours()},
+            EditSettingField::Active => {self.settings.active_fg_colour = next_colour(self.settings.active_fg_colour); self.settings.set_colours()},
+            EditSettingField::Title => {self.settings.title_fg_colour = next_colour(self.settings.title_fg_colour); self.settings.set_colours()},
+            _ => {}
+        }
+    }
+
+    fn dec_setting(&mut self) {
+        match self.edit_setting {
+            EditSettingField::Split => self.settings.is_horizontal = !self.settings.is_horizontal,
+            EditSettingField::NormalFg => {self.settings.normal_fg_colour = prev_colour(self.settings.normal_fg_colour); self.settings.set_colours()},
+            EditSettingField::NormalBg => {self.settings.normal_bg_colour = prev_colour(self.settings.normal_bg_colour); self.settings.set_colours()},
+            EditSettingField::SelectionFg => {self.settings.select_fg_colour = prev_colour(self.settings.select_fg_colour); self.settings.set_colours()},
+            EditSettingField::SelectionBg => {self.settings.select_bg_colour = prev_colour(self.settings.select_bg_colour); self.settings.set_colours()},
+            EditSettingField::Active => {self.settings.active_fg_colour = prev_colour(self.settings.active_fg_colour); self.settings.set_colours()},
+            EditSettingField::Title => {self.settings.title_fg_colour = prev_colour(self.settings.title_fg_colour); self.settings.set_colours()},
+            _ => {}
+        }
+    }
 }
 
 
@@ -789,6 +857,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Char('l') => app.state = AppState::Display,
                             KeyCode::Up => app.dec_setting_selection(),
                             KeyCode::Down => app.inc_setting_selection(),
+                            KeyCode::Right => app.inc_setting(),
+                            KeyCode::Left => app.dec_setting(),
                             KeyCode::Tab => app.state = AppState::Display,
                             KeyCode::BackTab => app.state = AppState::Stats,
                             _ => {}
@@ -797,7 +867,6 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                     Event::Tick => {},
                 }
             },
-            AppState::EditSetting => {},
         }
     }
 }
@@ -809,7 +878,6 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         AppState::EditTask => render_tasks(f, app),
         AppState::Stats => {},
         AppState::Settings => render_settings(f, app),
-        AppState::EditSetting => render_settings(f, app),
     }
 }
 

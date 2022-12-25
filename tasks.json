@@ -4,7 +4,7 @@
     "description": "Implement the ability to delete tasks upon pressing the 'd' key.",
     "is_done": true,
     "is_active": false,
-    "is_selected": true,
+    "is_selected": false,
     "elapsed_time": {
       "secs": 9,
       "nanos": 713170112
@@ -52,7 +52,7 @@
     "description": "A settings page with the ability to change the colour schemes, the layout between vertical and horizontal split. Remember to put an example at the bottom of it.",
     "is_done": true,
     "is_active": false,
-    "is_selected": false,
+    "is_selected": true,
     "elapsed_time": {
       "secs": 50906,
       "nanos": 370478200
