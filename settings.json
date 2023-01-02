@@ -11,8 +11,8 @@
     }
   },
   "highlight": {
-    "fg": "Black",
-    "bg": "Yellow",
+    "fg": "Gray",
+    "bg": "Cyan",
     "add_modifier": {
       "bits": 0
     },
@@ -32,7 +32,7 @@
   },
   "active_highlight": {
     "fg": "White",
-    "bg": "Yellow",
+    "bg": "Cyan",
     "add_modifier": {
       "bits": 0
     },
@@ -62,8 +62,8 @@
   },
   "normal_fg_colour": "Gray",
   "normal_bg_colour": "Black",
-  "select_fg_colour": "Black",
-  "select_bg_colour": "Yellow",
+  "select_fg_colour": "Gray",
+  "select_bg_colour": "Cyan",
   "active_fg_colour": "White",
   "title_fg_colour": "Cyan",
   "border_colour": "Cyan"

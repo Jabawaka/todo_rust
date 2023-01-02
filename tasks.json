@@ -1,1 +1,38 @@
-[]
+[
+  {
+    "title": "Pop up for adding/editing a task",
+    "description": "At the moment tasks are added by directly editing the description and title in the display box. However it would be better to introduce a pop up for editing and adding.",
+    "is_done": false,
+    "is_active": false,
+    "is_selected": true,
+    "elapsed_time": {
+      "secs": 99,
+      "nanos": 927698789
+    },
+    "created_on": "2022-12-19T08:47:46.797634100Z"
+  },
+  {
+    "title": "Reordering tasks in the active tasks page",
+    "description": "Pretty self-explanatory",
+    "is_done": false,
+    "is_active": false,
+    "is_selected": false,
+    "elapsed_time": {
+      "secs": 0,
+      "nanos": 0
+    },
+    "created_on": "2022-12-25T06:59:14.588001Z"
+  },
+  {
+    "title": "Scrolling tasks",
+    "description": "For now there are few tasks, but probably as they pile up we will need to scroll through them somehow.",
+    "is_done": false,
+    "is_active": false,
+    "is_selected": false,
+    "elapsed_time": {
+      "secs": 0,
+      "nanos": 0
+    },
+    "created_on": "2023-01-02T18:16:04.496013Z"
+  }
+]

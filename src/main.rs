@@ -307,7 +307,11 @@ impl App {
                 } else {
                     vec![]
                 },
-            curr_archive: 0,
+            curr_archive: if archive_items.len() > 0 {
+                archive_items.len() - 1
+            } else {
+                0
+            },
             state: AppState::Display,
             edit_field: EditField::Description,
             edit_setting: EditSettingField::Split,
@@ -330,6 +334,10 @@ impl App {
         let mut full_path = self.data_path.clone();
         full_path.push_str("tasks.json");
         fs::write(full_path, &serde_json::to_vec_pretty(&self.tasks).expect("DB should be writeable")).expect("DB should be writeable");
+
+        let mut arch_path = self.data_path.clone();
+        arch_path.push_str("archive.json");
+        fs::write(arch_path, &serde_json::to_vec_pretty(&self.archive).expect("Archive should be writeable")).expect("Archive should be writeable");
     }
 
     fn save_settings(&mut self) {
@@ -341,29 +349,66 @@ impl App {
     fn inc_sel_task(&mut self) {
         let mut index = 0;
 
-        if self.tasks.len() > 0 {
-            while index < self.tasks.len() - 1 {
-                if self.tasks[index].is_selected {
-                    self.tasks[index].is_selected = false;
-                    self.tasks[index + 1].is_selected = true;
-                    break;
-                }
+        match self.state {
+            AppState::Display => {
+                if self.tasks.len() > 0 {
+                    while index < self.tasks.len() - 1 {
+                        if self.tasks[index].is_selected {
+                            self.tasks[index].is_selected = false;
+                            self.tasks[index + 1].is_selected = true;
+                            break;
+                        }
 
-                index += 1;
-            }
+                        index += 1;
+                    }
+                }
+            },
+            AppState::Archived => {
+                if self.archive.len() > 0 {
+                    if self.archive[self.curr_archive].tasks.len() > 0 {
+                        while index < self.archive[self.curr_archive].tasks.len() - 1 {
+                            if self.archive[self.curr_archive].tasks[index].is_selected {
+                                self.archive[self.curr_archive].tasks[index].is_selected = false;
+                                self.archive[self.curr_archive].tasks[index + 1].is_selected = true;
+                                break;
+                            }
+
+                            index += 1;
+                        }
+                    }
+                }
+            },
+            _ => {}
         }
     }
 
     fn dec_sel_task(&mut self) {
         let mut index = 1;
 
-        while index < self.tasks.len() {
-            if self.tasks[index].is_selected {
-                self.tasks[index].is_selected = false;
-                self.tasks[index - 1].is_selected = true;
-            }
+        match self.state {
+            AppState::Display => {
+                while index < self.tasks.len() {
+                    if self.tasks[index].is_selected {
+                        self.tasks[index].is_selected = false;
+                        self.tasks[index - 1].is_selected = true;
+                    }
 
-            index += 1;
+                    index += 1;
+                }
+            },
+            AppState::Archived => {
+                if self.archive.len() > 0 {
+                    while index < self.archive[self.curr_archive].tasks.len() {
+                        if self.archive[self.curr_archive].tasks[index].is_selected {
+                            self.archive[self.curr_archive].tasks[index].is_selected = false;
+                            self.archive[self.curr_archive].tasks[index - 1].is_selected = true;
+                        }
+
+                        index += 1;
+                    }
+                }
+            },
+            _ => {}
         }
     }
 
@@ -603,52 +648,88 @@ impl App {
         self.set_cursor_pos(x, y + 1);
     }
 
-    fn get_sel_task_info(&mut self) -> Option<Vec<Spans>> {
-        for task in &self.tasks {
-            if task.is_selected {
-                let mut spans: Vec<Spans> = vec![];
-                if self.state == AppState::EditTask && self.edit_field == EditField::Description {
-                    if self.last_blink.elapsed() > BLINK_TIME {
-                        self.cursor_shown = !self.cursor_shown;
-                        self.last_blink = Instant::now();
-                    }
+    fn inc_arch_item(&mut self) {
+        if self.archive.len() > 0 {
+            if self.curr_archive < self.archive.len() - 1 {
+                self.curr_archive += 1;
+            }
+        }
+    }
 
-                    let blink_char = if self.cursor_shown {
-                        '_'
-                    } else if self.blink_char == '\n' {
-                        ' '
-                    } else {
-                        self.blink_char
-                    };
+    fn dec_arch_item(&mut self) {
+        if self.curr_archive > 0 {
+            self.curr_archive -= 1;
+        }
+    }
 
-                    self.disp_string = String::from("\n");
-                    self.disp_string.push_str(&self.first_string);
-                    self.disp_string.push(blink_char);
-                    if self.blink_char == '\n' {
-                        self.disp_string.push('\n');
-                    }
-                    self.disp_string.push_str(&self.second_string);
+    fn archive_done_tasks(&mut self) {
+        let mut new_arch_item = ArchiveItem {
+            date: Utc::now(),
+            tasks: vec![],
+        };
 
-                    let lines: Vec<&str> = self.disp_string.split("\n").collect();
-
-                    for line in lines {
-                        spans.push(Spans::from(vec![Span::styled(line, self.settings.default)]));
-                    }
-                } else {
-                    self.disp_string = String::from("\n");
-                    self.disp_string.push_str(&task.description);
-                    let lines: Vec<&str> = self.disp_string.split("\n").collect();
-
-                    for line in lines {
-                        spans.push(Spans::from(vec![Span::styled(line, self.settings.default)]));
-                    }
+        let mut index = 0;
+        let mut reset_selection = false;
+        while index < self.tasks.len() {
+            if self.tasks[index].is_done {
+                if self.tasks[index].is_selected {
+                    self.tasks[index].is_selected = false;
+                    reset_selection = true;
                 }
 
-                return Some(spans);
+                new_arch_item.tasks.push(self.tasks[index].clone());
+
+                self.tasks.remove(index);
+            } else {
+                index += 1;
             }
         }
 
-        None
+        if reset_selection && self.tasks.len() > 0 {
+            self.tasks[0].is_selected = true;
+        }
+
+        if new_arch_item.tasks.len() > 0 {
+            new_arch_item.tasks[0].is_selected = true;
+            self.archive.push(new_arch_item.clone());
+            self.curr_archive = self.archive.len() - 1;
+        }
+    }
+
+    fn dearchive_task(&mut self) {
+        if self.archive.len() > 0 {
+            let mut index = 0;
+
+            while index < self.archive[self.curr_archive].tasks.len() {
+                if self.archive[self.curr_archive].tasks[index].is_selected {
+                    self.archive[self.curr_archive].tasks[index].is_done = false;
+                    self.archive[self.curr_archive].tasks[index].is_selected = false;
+                    self.tasks.push(self.archive[self.curr_archive].tasks[index].clone());
+
+                    self.archive[self.curr_archive].tasks.remove(index);
+
+                    if self.archive[self.curr_archive].tasks.len() > 0 {
+                        if index < self.archive[self.curr_archive].tasks.len() {
+                            self.archive[self.curr_archive].tasks[index].is_selected = true;
+                        } else {
+                            self.archive[self.curr_archive].tasks[index - 1].is_selected = true;
+                        }
+                    }
+                }
+
+                index += 1;
+            }
+
+            if self.archive[self.curr_archive].tasks.len() == 0 {
+                self.archive.remove(self.curr_archive);
+
+                if self.archive.len() == 0 {
+                    self.curr_archive = 0;
+                } else if self.curr_archive >= self.archive.len() {
+                    self.curr_archive = self.archive.len() - 1;
+                }
+            }
+        }
     }
 
     fn get_curr_archive_item(&self) -> Option<ArchiveItem> {
@@ -659,32 +740,142 @@ impl App {
         None
     }
 
-    fn get_sel_task_title(&mut self) -> Option<String> {
-        for task in &self.tasks {
-            if task.is_selected {
-                if self.state == AppState::EditTask && self.edit_field == EditField::Title {
-                    if self.last_blink.elapsed() > BLINK_TIME {
-                        self.cursor_shown = !self.cursor_shown;
-                        self.last_blink = Instant::now();
+    fn get_sel_task_info(&mut self) -> Option<Vec<Spans>> {
+        match self.state {
+            AppState::Display => {
+                for task in &self.tasks {
+                    if task.is_selected {
+                        let mut spans: Vec<Spans> = vec![];
+
+                        self.disp_string = String::from("\n");
+                        self.disp_string.push_str(&task.description);
+                        let lines: Vec<&str> = self.disp_string.split("\n").collect();
+
+                        for line in lines {
+                            spans.push(Spans::from(vec![Span::styled(line, self.settings.default)]));
+                        }
+
+                        return Some(spans);
                     }
-
-                    let blink_char = if self.cursor_shown {
-                        '_'
-                    } else if self.blink_char == '\n' {
-                        ' '
-                    } else {
-                        self.blink_char
-                    };
-
-                    self.disp_string = self.first_string.clone();
-                    self.disp_string.push(blink_char);
-                    self.disp_string.push_str(&self.second_string);
-
-                    return Some(self.disp_string.clone());
-                } else {
-                    return Some(task.title.clone());
                 }
-            }
+            },
+            AppState::EditTask => {
+                for task in &self.tasks {
+                    if task.is_selected {
+                        let mut spans: Vec<Spans> = vec![];
+                        if self.edit_field == EditField::Description {
+                            if self.last_blink.elapsed() > BLINK_TIME {
+                                self.cursor_shown = !self.cursor_shown;
+                                self.last_blink = Instant::now();
+                            }
+
+                            let blink_char = if self.cursor_shown {
+                                '_'
+                            } else if self.blink_char == '\n' {
+                                ' '
+                            } else {
+                                self.blink_char
+                            };
+
+                            self.disp_string = String::from("\n");
+                            self.disp_string.push_str(&self.first_string);
+                            self.disp_string.push(blink_char);
+                            if self.blink_char == '\n' {
+                                self.disp_string.push('\n');
+                            }
+                            self.disp_string.push_str(&self.second_string);
+
+                            let lines: Vec<&str> = self.disp_string.split("\n").collect();
+
+                            for line in lines {
+                                spans.push(Spans::from(vec![Span::styled(line, self.settings.default)]));
+                            }
+                        } else {
+                            self.disp_string = String::from("\n");
+                            self.disp_string.push_str(&task.description);
+                            let lines: Vec<&str> = self.disp_string.split("\n").collect();
+
+                            for line in lines {
+                                spans.push(Spans::from(vec![Span::styled(line, self.settings.default)]));
+                            }
+                        }
+
+                        return Some(spans);
+                    }
+                }
+            },
+            AppState::Archived => {
+                if self.archive.len() > 0 {
+                    for task in &self.archive[self.curr_archive].tasks {
+                        if task.is_selected {
+                            let mut spans: Vec<Spans> = vec![];
+
+                            self.disp_string = String::from("\n");
+                            self.disp_string.push_str(&task.description);
+                            let lines: Vec<&str> = self.disp_string.split("\n").collect();
+
+                            for line in lines {
+                                spans.push(Spans::from(vec![Span::styled(line, self.settings.default)]));
+                            }
+
+                            return Some(spans);
+                        }
+                    }
+                }
+            },
+            _ => {}
+        }
+
+        None
+    }
+
+    fn get_sel_task_title(&mut self) -> Option<String> {
+        match self.state {
+            AppState::Display => {
+                for task in &self.tasks {
+                    if task.is_selected {
+                        return Some(task.title.clone());
+                    }
+                }
+            },
+            AppState::EditTask => {
+                for task in &self.tasks {
+                    if task.is_selected {
+                        if self.edit_field == EditField::Title {
+                            if self.last_blink.elapsed() > BLINK_TIME {
+                                self.cursor_shown = !self.cursor_shown;
+                                self.last_blink = Instant::now();
+                            }
+
+                            let blink_char = if self.cursor_shown {
+                                '_'
+                            } else if self.blink_char == '\n' {
+                                ' '
+                            } else {
+                                self.blink_char
+                            };
+
+                            self.disp_string = self.first_string.clone();
+                            self.disp_string.push(blink_char);
+                            self.disp_string.push_str(&self.second_string);
+
+                            return Some(self.disp_string.clone());
+                        } else {
+                            return Some(task.title.clone());
+                        }
+                    }
+                }
+            },
+            AppState::Archived => {
+                if self.archive.len() > 0 {
+                    for task in &self.archive[self.curr_archive].tasks {
+                        if task.is_selected {
+                            return Some(task.title.clone());
+                        }
+                    }
+                }
+            },
+            _ => {}
         }
 
         None
@@ -881,6 +1072,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                         match key.code {
                             KeyCode::Char('q') => {app.save_to_db(); app.save_settings(); return Ok(())},
                             KeyCode::Esc => {app.save_to_db(); app.save_settings(); return Ok(())},
+                            KeyCode::Char('c') => app.archive_done_tasks(),
                             KeyCode::Char('s') => app.save_to_db(),
                             KeyCode::Char('j') => app.inc_sel_task(),
                             KeyCode::Char('k') => app.dec_sel_task(),
@@ -924,6 +1116,15 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                         match key.code {
                             KeyCode::Char('q') => {app.save_to_db(); app.save_settings(); return Ok(())},
                             KeyCode::Esc => {app.save_to_db(); app.save_settings(); return Ok(())},
+                            KeyCode::Char('h') => app.inc_arch_item(),
+                            KeyCode::Char('l') => app.dec_arch_item(),
+                            KeyCode::Left => app.inc_arch_item(),
+                            KeyCode::Right => app.dec_arch_item(),
+                            KeyCode::Char('j') => app.inc_sel_task(),
+                            KeyCode::Char('k') => app.dec_sel_task(),
+                            KeyCode::Char(' ') => app.dearchive_task(),
+                            KeyCode::Down => app.inc_sel_task(),
+                            KeyCode::Up => app.dec_sel_task(),
                             KeyCode::Tab => app.state = AppState::Settings,
                             KeyCode::BackTab => app.state = AppState::Display,
                             _ => {}
@@ -1104,9 +1305,12 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             .style(border_style)
         );
 
-    let mut task_title = String::from(" ");
-    task_title.push_str(&app.get_sel_task_title().unwrap_or_else(|| { String::from("") }));
-    task_title.push_str(" ");
+    let mut task_title = String::from("");
+    if let Some(title) = app.get_sel_task_title() {
+        task_title = title;
+        task_title.insert(0, ' ');
+        task_title.push(' ');
+    }
 
     let task_description = Paragraph::new(app.get_sel_task_info().unwrap_or_else(|| { vec![Spans::from(vec![Span::styled("", default_style)])] }))
         .alignment(Alignment::Left)
@@ -1209,9 +1413,79 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .divider(Span::styled("|", default_style));
 
     // Render archive items
-    let archive_item = app.get_curr_archive_item();
+    let mut archive_title = String::from("");
+    let mut archive_tasks: Vec<_> = vec![];
+    let mut archive_durations: Vec<_> = vec![];
+    if let Some(archive_item) = app.get_curr_archive_item() {
+        archive_title = archive_item.date.to_string();
+        if app.archive.len() > 0 {
+            if app.curr_archive > 0 {
+                archive_title.push(' ');
+                archive_title.push('-');
+                archive_title.push('>');
+            } else {
+                archive_title.push(' ');
+                archive_title.push(' ');
+                archive_title.push(' ');
+            }
 
-    /*let archive_block = Paragraph::new(archive_tasks)
+            if app.curr_archive < app.archive.len() - 1 {
+                archive_title.insert(0, ' ');
+                archive_title.insert(0, '-');
+                archive_title.insert(0, '<');
+            } else {
+                archive_title.insert(0, ' ');
+                archive_title.insert(0, ' ');
+                archive_title.insert(0, ' ');
+            }
+        }
+
+        archive_title.insert(0, ' ');
+        archive_title.push(' ');
+
+        archive_tasks = archive_item.tasks
+            .iter()
+            .map(|task| {
+                let mut disp_string = String::from("[X] ");
+                disp_string.push_str(&task.title);
+
+                let mut style = app.settings.default;
+                if task.is_selected {
+                    if task.is_active {
+                        style = app.settings.active_highlight;
+                    } else {
+                        style = app.settings.highlight;
+                    }
+                } else if task.is_active {
+                    style = app.settings.active_normal;
+                }
+
+                Spans::from(vec![Span::styled(disp_string, style)])
+            })
+            .collect();
+        archive_tasks.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
+
+        archive_durations = archive_item.tasks
+            .iter()
+            .map(|task| {
+                let mut style = app.settings.default;
+                if task.is_selected {
+                    if task.is_active {
+                        style = app.settings.active_highlight;
+                    } else {
+                        style = app.settings.highlight;
+                    }
+                } else if task.is_active {
+                    style = app.settings.active_normal;
+                }
+
+                Spans::from(vec![Span::styled(task.get_time_str(), style)])
+            })
+            .collect();
+        archive_durations.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
+    }
+
+    let archive_block = Paragraph::new(archive_tasks)
         .alignment(Alignment::Left)
         .block(
             Block::default()
@@ -1240,10 +1514,10 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             .style(border_style)
             .title(task_title)
         )
-        .wrap(Wrap { trim: false });*/
+        .wrap(Wrap { trim: false });
 
     // Render instructions
-    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | Tab - Archive          | Shift+Tab - Settings  \n'c' - Archive tasks     | 's' - Save tasks       | enter - Activate task  | esc,'q' - Quit         ")
+    let instructions = Paragraph::new("'j' - Go up             | 'k' - Go down          | Tab - Settings         | Shift+Tab - Tasks     \n'h' - Newer archive     | 'l' - Older archive    | ' ' - Dearchive task   | esc,'q' - Quit         ")
         .style(default_style)
         .alignment(Alignment::Center)
         .block(
@@ -1254,9 +1528,9 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         );
 
     f.render_widget(tabs, chunks[0]);
-    /*f.render_widget(archive_block, hsplit_layout[0]);
+    f.render_widget(archive_block, hsplit_layout[0]);
     f.render_widget(archive_dur_block, hsplit_layout[1]);
-    f.render_widget(task_description, vsplit_layout[1]);*/
+    f.render_widget(task_description, vsplit_layout[1]);
     f.render_widget(instructions, chunks[2]);
 }
 
@@ -1462,7 +1736,7 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         );
 
     // Render instructions
-    let instructions = Paragraph::new("Up/Down - Select       | Left/Right - Modify    | Tab - Archive          | Shift+Tab - Tasks      ")
+    let instructions = Paragraph::new("Up/Down - Select        | Left/Right - Modify    | Tab - Archive          | Shift+Tab - Tasks      ")
         .style(default_style)
         .alignment(Alignment::Center)
         .block(
