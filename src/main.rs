@@ -114,6 +114,12 @@ impl Task {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+struct ArchiveItem {
+    date: DateTime<Utc>,
+    tasks: Vec<Task>,
+}
+
 
 #[derive(Serialize, Deserialize)]
 struct Settings {
@@ -146,6 +152,31 @@ impl Settings {
         self.active_highlight = Style::default().fg(self.active_fg_colour).bg(self.select_bg_colour);
         self.title = Style::default().fg(self.title_fg_colour).bg(self.normal_bg_colour);
         self.border = Style::default().fg(self.border_colour).bg(self.normal_bg_colour);
+    }
+
+    fn default_settings() -> Settings {
+        let mut settings: Settings = Settings {
+            is_horizontal: true,
+
+            default:          Style::default(),
+            highlight:        Style::default(),
+            active_normal:    Style::default(),
+            active_highlight: Style::default(),
+            title:            Style::default(),
+            border:           Style::default(),
+
+            normal_fg_colour: Color::White,
+            normal_bg_colour: Color::Black,
+            select_fg_colour: Color::Black,
+            select_bg_colour: Color::White,
+            active_fg_colour: Color::Green,
+            title_fg_colour:  Color::Green,
+            border_colour:    Color::Green,
+        };
+
+        settings.set_colours();
+
+        settings
     }
 }
 
@@ -197,9 +228,11 @@ fn prev_colour(colour: Color) -> Color {
 
 struct App {
     // App state
-    db_path: String,
+    data_path: String,
     last_event: Instant,
     tasks: Vec<Task>,
+    archive: Vec<ArchiveItem>,
+    curr_archive: usize,
     state: AppState,
     edit_field: EditField,
     edit_setting: EditSettingField,
@@ -221,7 +254,19 @@ struct App {
 }
 
 impl App {
-    fn new(path_to_db: &String) -> Result<App, Box<dyn std::error::Error>> {
+    fn new(path_to_folder: &String) -> Result<App, Box<dyn std::error::Error>> {
+        let temp_path_to_db = Path::new(path_to_folder).join("tasks.json");
+        let path_to_db = temp_path_to_db.as_path();
+        let temp_path_to_archive = Path::new(&path_to_folder).join("archive.json");
+        let path_to_archive = temp_path_to_archive.as_path();
+        let temp_path_to_settings = Path::new(&path_to_folder).join("settings.json");
+        let path_to_settings = temp_path_to_settings.as_path();
+
+        if !path_to_db.exists() {
+            let mut file = File::create(path_to_db)?;
+            file.write_all(b"[]")?;
+        }
+
         let db_content = fs::read_to_string(path_to_db)?;
         let mut parsed_tasks: Vec<Task> = serde_json::from_str(&db_content)?;
 
@@ -233,13 +278,36 @@ impl App {
             parsed_tasks[0].is_selected = true;
         }
 
-        let settings_content = fs::read_to_string("settings.json")?;
-        let settings: Settings = serde_json::from_str(&settings_content)?;
+        if !path_to_archive.exists() {
+            let mut file = File::create(path_to_archive)?;
+            file.write_all(b"[]")?;
+        }
+
+        let archive_content = fs::read_to_string(path_to_archive)?;
+        let archive_items: Vec<ArchiveItem> = serde_json::from_str(&archive_content)?;
+
+        let settings: Settings;
+        if path_to_settings.exists() {
+            let settings_content = fs::read_to_string("settings.json")?;
+            settings = serde_json::from_str(&settings_content)?;
+        } else {
+            settings = Settings::default_settings();
+        }
 
         Ok(App {
-            db_path: path_to_db.clone(),
+            data_path: path_to_folder.clone(),
             last_event: Instant::now(),
             tasks: parsed_tasks.to_owned(),
+            archive: if archive_items.len() > 0 {
+                    archive_items.iter().map(|a| {
+                    ArchiveItem {
+                        date: a.date,
+                        tasks: a.tasks.to_owned()}
+                    }).collect()
+                } else {
+                    vec![]
+                },
+            curr_archive: 0,
             state: AppState::Display,
             edit_field: EditField::Description,
             edit_setting: EditSettingField::Split,
@@ -259,24 +327,30 @@ impl App {
     }
 
     fn save_to_db(&mut self) {
-        fs::write(&self.db_path, &serde_json::to_vec_pretty(&self.tasks).expect("DB should be writeable")).expect("DB should be writeable");
+        let mut full_path = self.data_path.clone();
+        full_path.push_str("tasks.json");
+        fs::write(full_path, &serde_json::to_vec_pretty(&self.tasks).expect("DB should be writeable")).expect("DB should be writeable");
     }
 
     fn save_settings(&mut self) {
-        fs::write("settings.json", &serde_json::to_vec_pretty(&self.settings).expect("Settings should be writeable")).expect("Settings should be writeable");
+        let mut full_path = self.data_path.clone();
+        full_path.push_str("settings.json");
+        fs::write(full_path, &serde_json::to_vec_pretty(&self.settings).expect("Settings should be writeable")).expect("Settings should be writeable");
     }
 
     fn inc_sel_task(&mut self) {
         let mut index = 0;
 
-        while index < self.tasks.len() - 1 {
-            if self.tasks[index].is_selected {
-                self.tasks[index].is_selected = false;
-                self.tasks[index + 1].is_selected = true;
-                break;
-            }
+        if self.tasks.len() > 0 {
+            while index < self.tasks.len() - 1 {
+                if self.tasks[index].is_selected {
+                    self.tasks[index].is_selected = false;
+                    self.tasks[index + 1].is_selected = true;
+                    break;
+                }
 
-            index += 1;
+                index += 1;
+            }
         }
     }
 
@@ -558,7 +632,7 @@ impl App {
                     let lines: Vec<&str> = self.disp_string.split("\n").collect();
 
                     for line in lines {
-                        spans.push(Spans::from(vec![Span::raw(line)]));
+                        spans.push(Spans::from(vec![Span::styled(line, self.settings.default)]));
                     }
                 } else {
                     self.disp_string = String::from("\n");
@@ -566,7 +640,7 @@ impl App {
                     let lines: Vec<&str> = self.disp_string.split("\n").collect();
 
                     for line in lines {
-                        spans.push(Spans::from(vec![Span::raw(line)]));
+                        spans.push(Spans::from(vec![Span::styled(line, self.settings.default)]));
                     }
                 }
 
@@ -574,6 +648,14 @@ impl App {
             }
         }
 
+        None
+    }
+
+    fn get_curr_archive_item(&self) -> Option<ArchiveItem> {
+        if self.archive.len() > 0 {
+            let active_archive = self.archive[self.curr_archive].clone();
+            return Some(active_archive);
+        }
         None
     }
 
@@ -723,9 +805,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ---- PARSE INPUT ARGUMENTS AND CREATE APP ----
     let in_args: Vec<String> = env::args().collect();
     let num_args = in_args.len();
-    let mut path_to_db = String::from("tasks.json");
+    let path_to_folder: String;
 
-    if num_args > 2 {
+    if num_args > 3 {
         println!("");
         println!("Too many arguments supplied! Either:");
         println!("  - Run the program with no args: this will create a local database file (tasks.json)");
@@ -733,15 +815,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("");
         panic!();
     } else if num_args == 1 {
-        if !Path::new("tasks.json").exists() {
-            let mut file = File::create("tasks.json")?;
-            file.write_all(b"[]")?;
-        }
+        path_to_folder = String::from("./");
     } else {
-        path_to_db = in_args[1].clone();
+        path_to_folder = in_args[1].clone();
     }
 
-    let app = App::new(&path_to_db)?;
+    let app = App::new(&path_to_folder)?;
 
     // ---- RUN APP ----
     let res = run_app(&mut terminal, app);
@@ -1029,7 +1108,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     task_title.push_str(&app.get_sel_task_title().unwrap_or_else(|| { String::from("") }));
     task_title.push_str(" ");
 
-    let task_description = Paragraph::new(app.get_sel_task_info().unwrap_or_else(|| { vec![Spans::from(vec![Span::raw("")])] }))
+    let task_description = Paragraph::new(app.get_sel_task_info().unwrap_or_else(|| { vec![Spans::from(vec![Span::styled("", default_style)])] }))
         .alignment(Alignment::Left)
         .block(
             Block::default()
@@ -1129,65 +1208,19 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .highlight_style(app.settings.title)
         .divider(Span::styled("|", default_style));
 
-    // Render tasks information
-    let mut tasks: Vec<_> = app.tasks
-        .iter()
-        .map(|task| {
-            let mut disp_string = String::from("");
-            if task.is_done {
-                disp_string.push_str("[X] ");
-            } else {
-                disp_string.push_str("[ ] ");
-            }
-            disp_string.push_str(&task.title);
+    // Render archive items
+    let archive_item = app.get_curr_archive_item();
 
-            let mut style = app.settings.default;
-            if task.is_selected {
-                if task.is_active {
-                    style = app.settings.active_highlight;
-                } else {
-                    style = app.settings.highlight;
-                }
-            } else if task.is_active {
-                style = app.settings.active_normal;
-            }
-
-            Spans::from(vec![Span::styled(disp_string, style)])
-        })
-        .collect();
-
-    tasks.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
-
-    let mut tasks_duration: Vec<_> = app.tasks
-        .iter()
-        .map(|task| {
-            let mut style = app.settings.default;
-            if task.is_selected {
-                if task.is_active {
-                    style = app.settings.active_highlight;
-                } else {
-                    style = app.settings.highlight;
-                }
-            } else if task.is_active {
-                style = app.settings.active_normal;
-            }
-
-            Spans::from(vec![Span::styled(task.get_time_str(), style)])
-        })
-        .collect();
-
-    tasks_duration.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
-
-    let task_block = Paragraph::new(tasks)
+    /*let archive_block = Paragraph::new(archive_tasks)
         .alignment(Alignment::Left)
         .block(
             Block::default()
             .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
             .style(border_style)
-            .title(" Archive ")
+            .title(archive_title)
         );
 
-    let task_dur_block = Paragraph::new(tasks_duration)
+    let archive_dur_block = Paragraph::new(archive_durations)
         .alignment(Alignment::Right)
         .block(
             Block::default()
@@ -1199,7 +1232,7 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     task_title.push_str(&app.get_sel_task_title().unwrap_or_else(|| { String::from("") }));
     task_title.push_str(" ");
 
-    let task_description = Paragraph::new(app.get_sel_task_info().unwrap_or_else(|| { vec![Spans::from(vec![Span::raw("")])] }))
+    let task_description = Paragraph::new(app.get_sel_task_info().unwrap_or_else(|| { vec![Spans::from(vec![Span::styled("", default_style)])] }))
         .alignment(Alignment::Left)
         .block(
             Block::default()
@@ -1207,7 +1240,7 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             .style(border_style)
             .title(task_title)
         )
-        .wrap(Wrap { trim: false });
+        .wrap(Wrap { trim: false });*/
 
     // Render instructions
     let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | Tab - Archive          | Shift+Tab - Settings  \n'c' - Archive tasks     | 's' - Save tasks       | enter - Activate task  | esc,'q' - Quit         ")
@@ -1221,9 +1254,9 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         );
 
     f.render_widget(tabs, chunks[0]);
-    f.render_widget(task_block, hsplit_layout[0]);
-    f.render_widget(task_dur_block, hsplit_layout[1]);
-    f.render_widget(task_description, vsplit_layout[1]);
+    /*f.render_widget(archive_block, hsplit_layout[0]);
+    f.render_widget(archive_dur_block, hsplit_layout[1]);
+    f.render_widget(task_description, vsplit_layout[1]);*/
     f.render_widget(instructions, chunks[2]);
 }
 
