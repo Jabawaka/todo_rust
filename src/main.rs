@@ -346,6 +346,38 @@ impl App {
         fs::write(full_path, &serde_json::to_vec_pretty(&self.settings).expect("Settings should be writeable")).expect("Settings should be writeable");
     }
 
+    fn move_task_up(&mut self) {
+        if self.tasks.len() > 1 {
+            let mut index = self.tasks.len() - 1;
+            while index > 0 {
+                if self.tasks[index].is_selected {
+                    let copy_task = self.tasks[index].clone();
+                    self.tasks[index] = self.tasks[index - 1].clone();
+                    self.tasks[index - 1] = copy_task;
+                    break;
+                }
+
+                index -= 1;
+            }
+        }
+    }
+
+    fn move_task_down(&mut self) {
+        if self.tasks.len() > 1 {
+            let mut index = 0;
+            while index < self.tasks.len() - 1 {
+                if self.tasks[index].is_selected {
+                    let copy_task = self.tasks[index].clone();
+                    self.tasks[index] = self.tasks[index + 1].clone();
+                    self.tasks[index + 1] = copy_task;
+                    break;
+                }
+
+                index += 1;
+            }
+        }
+    }
+
     fn inc_sel_task(&mut self) {
         let mut index = 0;
 
@@ -1076,6 +1108,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Char('s') => app.save_to_db(),
                             KeyCode::Char('j') => app.inc_sel_task(),
                             KeyCode::Char('k') => app.dec_sel_task(),
+                            KeyCode::Char('u') => app.move_task_down(),
+                            KeyCode::Char('i') => app.move_task_up(),
                             KeyCode::Down => app.inc_sel_task(),
                             KeyCode::Up => app.dec_sel_task(),
                             KeyCode::Enter => app.activate_task(),
