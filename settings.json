@@ -1,5 +1,5 @@
 {
-  "is_horizontal": true,
+  "is_horizontal": false,
   "default": {
     "fg": "Yellow",
     "bg": "Black",
@@ -11,8 +11,8 @@
     }
   },
   "highlight": {
-    "fg": "Gray",
-    "bg": "Red",
+    "fg": "Yellow",
+    "bg": "Blue",
     "add_modifier": {
       "bits": 0
     },
@@ -32,7 +32,7 @@
   },
   "active_highlight": {
     "fg": "White",
-    "bg": "Red",
+    "bg": "Blue",
     "add_modifier": {
       "bits": 0
     },
@@ -41,7 +41,7 @@
     }
   },
   "title": {
-    "fg": "Yellow",
+    "fg": "Cyan",
     "bg": "Black",
     "add_modifier": {
       "bits": 0
@@ -51,7 +51,7 @@
     }
   },
   "border": {
-    "fg": "Yellow",
+    "fg": "DarkGray",
     "bg": "Black",
     "add_modifier": {
       "bits": 0
@@ -62,9 +62,9 @@
   },
   "normal_fg_colour": "Yellow",
   "normal_bg_colour": "Black",
-  "select_fg_colour": "Gray",
-  "select_bg_colour": "Red",
+  "select_fg_colour": "Yellow",
+  "select_bg_colour": "Blue",
   "active_fg_colour": "White",
-  "title_fg_colour": "Yellow",
-  "border_colour": "Yellow"
+  "title_fg_colour": "Cyan",
+  "border_colour": "DarkGray"
 }

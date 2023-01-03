@@ -4,7 +4,7 @@
     "description": "Pretty self explanatory.",
     "is_done": true,
     "is_active": false,
-    "is_selected": false,
+    "is_selected": true,
     "elapsed_time": {
       "secs": 458,
       "nanos": 691220818
@@ -12,11 +12,23 @@
     "created_on": "2022-12-25T06:59:14.588001Z"
   },
   {
+    "title": "Refactor rendering functions",
+    "description": "The render functions contain the same basic code repeated because it was simpler, it can be massively simplified. In doing so, the pop up should be easier to implement.",
+    "is_done": false,
+    "is_active": true,
+    "is_selected": false,
+    "elapsed_time": {
+      "secs": 197,
+      "nanos": 352882900
+    },
+    "created_on": "2023-01-03T15:02:00.713053800Z"
+  },
+  {
     "title": "Pop up for adding/editing a task",
     "description": "At the moment tasks are added by directly editing the description and title in the display box. However it would be better to introduce a pop up for editing and adding.",
     "is_done": false,
     "is_active": false,
-    "is_selected": true,
+    "is_selected": false,
     "elapsed_time": {
       "secs": 99,
       "nanos": 927698789

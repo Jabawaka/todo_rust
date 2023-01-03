@@ -10,7 +10,7 @@ use chrono::prelude::*;
 
 use tui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Alignment, Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Spans, Span},
     widgets::{
@@ -36,7 +36,7 @@ enum Event<I> {
     Tick,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone)]
 enum AppState {
     Display,
     EditTask,
@@ -1193,20 +1193,39 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
 
 // UI function
 fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+    let chunks = create_chunks(f);
+    render_menu(f, &chunks[0], app);
+
+    let disp_instructions = "' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | Tab - Archive          | Shift+Tab - Settings  \n'c' - Archive tasks     | 's' - Save tasks       | enter - Activate task  | esc,'q' - Quit         ";
+    let arch_instructions = "'j' - Go up             | 'k' - Go down          | Tab - Settings         | Shift+Tab - Tasks      \n'h' - Newer archive     | 'l' - Older archive    | ' ' - Dearchive task   | esc,'q' - Quit        ";
+    let sett_instructions = "Up/Down - Select        | Left/Right - Modify    | Tab - Archive          | Shift+Tab - Tasks      ";
+
     match app.state {
-        AppState::Display => render_tasks(f, app),
-        AppState::EditTask => render_tasks(f, app),
-        AppState::Archived => render_archived(f, app),
-        AppState::Settings => render_settings(f, app),
+        AppState::Display  => {
+            render_tasks(f, &chunks[1], app);
+            render_instructions(f, &chunks[2], &app.settings, &disp_instructions);
+        },
+        AppState::EditTask => {
+            render_tasks(f, &chunks[1], app);
+            render_instructions(f, &chunks[2], &app.settings, &disp_instructions);
+        },
+        AppState::Archived => {
+            render_archived(f, &chunks[1], app);
+            render_instructions(f, &chunks[2], &app.settings, &arch_instructions);
+        },
+        AppState::Settings => {
+            render_settings(f, &chunks[1], app);
+            render_instructions(f, &chunks[2], &app.settings, &sett_instructions);
+        },
     }
 }
 
 
-// Render tasks screen
-fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+// Create main layout chunks
+fn create_chunks<B: Backend>(f: &mut Frame<B>) -> Vec<Rect> {
     let size = f.size();
 
-    let chunks = Layout::default()
+    Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
         .constraints(
@@ -1215,8 +1234,58 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 Constraint::Min(2),
                 Constraint::Length(4),
             ].as_ref(),
-        ).split(size);
+        ).split(size)
+}
 
+
+// Render menu
+fn render_menu<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &App) {
+    let menu_titles = vec!["Active tasks", "Archived tasks", "Settings"];
+    let menu = menu_titles
+        .iter()
+        .map(|t| {
+            let (first, rest) = t.split_at(1);
+            Spans::from(vec![
+                Span::styled(
+                    first,
+                    app.settings.title,
+                ),
+                Span::styled(rest, app.settings.default),
+            ])
+        })
+        .collect();
+
+    let state = app.state.into();
+    let tabs = Tabs::new(menu)
+        .select(state)
+        .block(Block::default().borders(Borders::BOTTOM).border_type(BorderType::Double).style(app.settings.border))
+        .style(app.settings.default)
+        .highlight_style(app.settings.title)
+        .divider(Span::styled("||", app.settings.default));
+
+    f.render_widget(tabs, *rect);
+}
+
+
+// Render instructions
+fn render_instructions<B: Backend>(f: &mut Frame<B>, rect: &Rect, settings: &Settings, inst_str: &str) {
+    // Render instructions
+    let instructions = Paragraph::new(inst_str)
+        .style(settings.border)
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::TOP)
+                .style(settings.border)
+                .border_type(BorderType::Double)
+        );
+
+    f.render_widget(instructions, *rect);
+}
+
+
+// Render tasks screen
+fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     let vsplit_layout = if app.settings.is_horizontal {
         Layout::default()
         .direction(Direction::Horizontal)
@@ -1225,7 +1294,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 Constraint::Percentage(50),
                 Constraint::Percentage(50),
             ]
-        ).split(chunks[1])
+        ).split(*rect)
     } else {
         Layout::default()
         .direction(Direction::Vertical)
@@ -1234,7 +1303,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 Constraint::Percentage(50),
                 Constraint::Percentage(50),
             ]
-        ).split(chunks[1])
+        ).split(*rect)
     };
 
     let hsplit_layout = Layout::default()
@@ -1249,29 +1318,6 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     app.desc_width_char = vsplit_layout[1].width - 2;
     let default_style = app.settings.default.clone();
     let border_style = app.settings.border.clone();
-
-    // Render menu
-    let menu_titles = vec!["Active tasks", "Archived tasks", "Settings"];
-    let menu = menu_titles
-        .iter()
-        .map(|t| {
-            let (first, rest) = t.split_at(1);
-            Spans::from(vec![
-                Span::styled(
-                    first,
-                    app.settings.title,
-                ),
-                Span::styled(rest, default_style),
-            ])
-        })
-        .collect();
-
-    let tabs = Tabs::new(menu)
-        .select(AppState::Display.into())
-        .block(Block::default().borders(Borders::BOTTOM).border_type(BorderType::Double).style(border_style))
-        .style(default_style)
-        .highlight_style(app.settings.title)
-        .divider(Span::styled("|", default_style));
 
     // Render tasks information
     let mut tasks: Vec<_> = app.tasks
@@ -1356,40 +1402,14 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .wrap(Wrap { trim: false });
 
-    // Render instructions
-    let instructions = Paragraph::new("' ' - Mark task as done | 'a' - Add task         | 'e' - Edit task        | 'd' - Delete task      \n'j' - Go up             | 'k' - Go down          | Tab - Archive          | Shift+Tab - Settings  \n'c' - Archive tasks     | 's' - Save tasks       | enter - Activate task  | esc,'q' - Quit         ")
-        .style(default_style)
-        .alignment(Alignment::Center)
-        .block(
-            Block::default()
-                .borders(Borders::TOP)
-                .style(border_style)
-                .border_type(BorderType::Double)
-        );
-
-    f.render_widget(tabs, chunks[0]);
     f.render_widget(task_block, hsplit_layout[0]);
     f.render_widget(task_dur_block, hsplit_layout[1]);
     f.render_widget(task_description, vsplit_layout[1]);
-    f.render_widget(instructions, chunks[2]);
 }
 
 
 // Render tasks screen
-fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-    let size = f.size();
-
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(2)
-        .constraints(
-            [
-                Constraint::Length(2),
-                Constraint::Min(2),
-                Constraint::Length(4),
-            ].as_ref(),
-        ).split(size);
-
+fn render_archived<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     let vsplit_layout = if app.settings.is_horizontal {
         Layout::default()
         .direction(Direction::Horizontal)
@@ -1398,7 +1418,7 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 Constraint::Percentage(50),
                 Constraint::Percentage(50),
             ]
-        ).split(chunks[1])
+        ).split(*rect)
     } else {
         Layout::default()
         .direction(Direction::Vertical)
@@ -1407,7 +1427,7 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 Constraint::Percentage(50),
                 Constraint::Percentage(50),
             ]
-        ).split(chunks[1])
+        ).split(*rect)
     };
 
     let hsplit_layout = Layout::default()
@@ -1423,35 +1443,13 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let default_style = app.settings.default.clone();
     let border_style = app.settings.border.clone();
 
-    // Render menu
-    let menu_titles = vec!["Active tasks", "Archived tasks", "Settings"];
-    let menu = menu_titles
-        .iter()
-        .map(|t| {
-            let (first, rest) = t.split_at(1);
-            Spans::from(vec![
-                Span::styled(
-                    first,
-                    app.settings.title,
-                ),
-                Span::styled(rest, default_style),
-            ])
-        })
-        .collect();
-
-    let tabs = Tabs::new(menu)
-        .select(AppState::Archived.into())
-        .block(Block::default().borders(Borders::BOTTOM).border_type(BorderType::Double).style(border_style))
-        .style(default_style)
-        .highlight_style(app.settings.title)
-        .divider(Span::styled("|", default_style));
-
     // Render archive items
     let mut archive_title = String::from("");
     let mut archive_tasks: Vec<_> = vec![];
     let mut archive_durations: Vec<_> = vec![];
     if let Some(archive_item) = app.get_curr_archive_item() {
-        archive_title = archive_item.date.to_string();
+        let converted_date = format!("{}", archive_item.date.format("%Y/%m/%d"));
+        archive_title.push_str(&converted_date);
         if app.archive.len() > 0 {
             if app.curr_archive > 0 {
                 archive_title.push(' ');
@@ -1550,40 +1548,14 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .wrap(Wrap { trim: false });
 
-    // Render instructions
-    let instructions = Paragraph::new("'j' - Go up             | 'k' - Go down          | Tab - Settings         | Shift+Tab - Tasks     \n'h' - Newer archive     | 'l' - Older archive    | ' ' - Dearchive task   | esc,'q' - Quit         ")
-        .style(default_style)
-        .alignment(Alignment::Center)
-        .block(
-            Block::default()
-                .borders(Borders::TOP)
-                .style(border_style)
-                .border_type(BorderType::Double)
-        );
-
-    f.render_widget(tabs, chunks[0]);
     f.render_widget(archive_block, hsplit_layout[0]);
     f.render_widget(archive_dur_block, hsplit_layout[1]);
     f.render_widget(task_description, vsplit_layout[1]);
-    f.render_widget(instructions, chunks[2]);
 }
 
 
 // Render settings
-fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-    let size = f.size();
-
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(2)
-        .constraints(
-            [
-                Constraint::Length(2),
-                Constraint::Min(2),
-                Constraint::Length(4),
-            ].as_ref(),
-        ).split(size);
-
+fn render_settings<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     let vsplit_layout = if app.settings.is_horizontal {
         Layout::default()
         .direction(Direction::Horizontal)
@@ -1592,7 +1564,7 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 Constraint::Percentage(50),
                 Constraint::Percentage(50),
             ]
-        ).split(chunks[1])
+        ).split(*rect)
     } else {
         Layout::default()
         .direction(Direction::Vertical)
@@ -1601,7 +1573,7 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 Constraint::Percentage(50),
                 Constraint::Percentage(50),
             ]
-        ).split(chunks[1])
+        ).split(*rect)
     };
 
     let hsplit_layout = Layout::default()
@@ -1614,31 +1586,7 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         ).split(vsplit_layout[0]);
 
     // Capture displaying variables
-    let default_style = app.settings.default.clone();
     let border_style = app.settings.border.clone();
-
-    // Render menu
-    let menu_titles = vec!["Active tasks", "Archived tasks", "Settings"];
-    let menu = menu_titles
-        .iter()
-        .map(|t| {
-            let (first, rest) = t.split_at(1);
-            Spans::from(vec![
-                Span::styled(
-                    first,
-                    app.settings.title,
-                ),
-                Span::styled(rest, default_style),
-            ])
-        })
-        .collect();
-
-    let tabs = Tabs::new(menu)
-        .select(AppState::Settings.into())
-        .block(Block::default().borders(Borders::BOTTOM).border_type(BorderType::Double).style(border_style))
-        .style(default_style)
-        .highlight_style(app.settings.title)
-        .divider(Span::styled("|", default_style));
 
     // Render settings
     let settings_sections = Paragraph::new(vec![
@@ -1769,20 +1717,7 @@ fn render_settings<B: Backend>(f: &mut Frame<B>, app: &mut App) {
                 .title(" Example ")
         );
 
-    // Render instructions
-    let instructions = Paragraph::new("Up/Down - Select        | Left/Right - Modify    | Tab - Archive          | Shift+Tab - Tasks      ")
-        .style(default_style)
-        .alignment(Alignment::Center)
-        .block(
-            Block::default()
-                .borders(Borders::TOP)
-                .style(border_style)
-                .border_type(BorderType::Double)
-        );
-
-    f.render_widget(tabs, chunks[0]);
     f.render_widget(settings_sections, hsplit_layout[0]);
     f.render_widget(settings_values, hsplit_layout[1]);
     f.render_widget(example, vsplit_layout[1]);
-    f.render_widget(instructions, chunks[2]);
 }

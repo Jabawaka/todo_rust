@@ -1,13 +1,13 @@
 [
   {
-    "date": "2023-01-02T19:15:00.042703Z",
+    "date": "2023-01-01T19:15:00.042703Z",
     "tasks": [
       {
         "title": "Cursor behaviour",
         "description": "Implement all normal cursor behaviour:\n - Going back and forward through the command line.\n - Going up and down lines.\n - At end/beginning of lines, go to the end/beginning of line.",
         "is_done": true,
         "is_active": false,
-        "is_selected": true,
+        "is_selected": false,
         "elapsed_time": {
           "secs": 3,
           "nanos": 749001041
@@ -19,7 +19,7 @@
         "description": "A settings page with the ability to change the colour schemes, the layout between vertical and horizontal split. Remember to put an example at the bottom of it.",
         "is_done": true,
         "is_active": false,
-        "is_selected": false,
+        "is_selected": true,
         "elapsed_time": {
           "secs": 50906,
           "nanos": 370478200
@@ -70,7 +70,7 @@
     ]
   },
   {
-    "date": "2023-01-02T19:18:01.208826Z",
+    "date": "2023-01-03T19:18:01.208826Z",
     "tasks": [
       {
         "title": "Reopen tasks",
