@@ -121,5 +121,46 @@
         "created_on": "2022-12-18T20:39:04.050892Z"
       }
     ]
+  },
+  {
+    "date": "2023-01-05T06:55:03.928237Z",
+    "tasks": [
+      {
+        "title": "Reordering tasks in the active tasks page",
+        "description": "Pretty self explanatory.",
+        "is_done": true,
+        "is_active": false,
+        "is_selected": true,
+        "elapsed_time": {
+          "secs": 458,
+          "nanos": 691220818
+        },
+        "created_on": "2022-12-25T06:59:14.588001Z"
+      },
+      {
+        "title": "Refactor rendering functions",
+        "description": "The render functions contain the same basic code repeated because it was simpler, it can be massively simplified. In doing so, the pop up should be easier to implement.",
+        "is_done": true,
+        "is_active": false,
+        "is_selected": false,
+        "elapsed_time": {
+          "secs": 198,
+          "nanos": 985653438
+        },
+        "created_on": "2023-01-03T15:02:00.713053800Z"
+      },
+      {
+        "title": "Pop up for adding/editing a task",
+        "description": "At the moment tasks are added by directly editing the description and title in the display box. However it would be better to introduce a pop up for editing and adding.",
+        "is_done": true,
+        "is_active": false,
+        "is_selected": false,
+        "elapsed_time": {
+          "secs": 137,
+          "nanos": 770920348
+        },
+        "created_on": "2022-12-19T08:47:46.797634100Z"
+      }
+    ]
   }
 ]

@@ -14,7 +14,7 @@ use tui::{
     style::{Color, Modifier, Style},
     text::{Spans, Span},
     widgets::{
-        Block, BorderType, Borders, Paragraph, Tabs, Wrap,
+        Block, BorderType, Borders, Clear, Paragraph, Tabs, Wrap,
     },
     Frame, Terminal,
 };
@@ -795,6 +795,50 @@ impl App {
                 for task in &self.tasks {
                     if task.is_selected {
                         let mut spans: Vec<Spans> = vec![];
+
+                        self.disp_string = String::from("\n");
+                        self.disp_string.push_str(&task.description);
+                        let lines: Vec<&str> = self.disp_string.split("\n").collect();
+
+                        for line in lines {
+                            spans.push(Spans::from(vec![Span::styled(line, self.settings.default)]));
+                        }
+
+                        return Some(spans);
+                    }
+                }
+            },
+            AppState::Archived => {
+                if self.archive.len() > 0 {
+                    for task in &self.archive[self.curr_archive].tasks {
+                        if task.is_selected {
+                            let mut spans: Vec<Spans> = vec![];
+
+                            self.disp_string = String::from("\n");
+                            self.disp_string.push_str(&task.description);
+                            let lines: Vec<&str> = self.disp_string.split("\n").collect();
+
+                            for line in lines {
+                                spans.push(Spans::from(vec![Span::styled(line, self.settings.default)]));
+                            }
+
+                            return Some(spans);
+                        }
+                    }
+                }
+            },
+            _ => {}
+        }
+
+        None
+    }
+
+    fn get_sel_task_info_editable(&mut self) -> Option<Vec<Spans>> {
+        match self.state {
+            AppState::EditTask => {
+                for task in &self.tasks {
+                    if task.is_selected {
+                        let mut spans: Vec<Spans> = vec![];
                         if self.edit_field == EditField::Description {
                             if self.last_blink.elapsed() > BLINK_TIME {
                                 self.cursor_shown = !self.cursor_shown;
@@ -836,25 +880,6 @@ impl App {
                     }
                 }
             },
-            AppState::Archived => {
-                if self.archive.len() > 0 {
-                    for task in &self.archive[self.curr_archive].tasks {
-                        if task.is_selected {
-                            let mut spans: Vec<Spans> = vec![];
-
-                            self.disp_string = String::from("\n");
-                            self.disp_string.push_str(&task.description);
-                            let lines: Vec<&str> = self.disp_string.split("\n").collect();
-
-                            for line in lines {
-                                spans.push(Spans::from(vec![Span::styled(line, self.settings.default)]));
-                            }
-
-                            return Some(spans);
-                        }
-                    }
-                }
-            },
             _ => {}
         }
 
@@ -870,6 +895,30 @@ impl App {
                     }
                 }
             },
+            AppState::EditTask => {
+                for task in &self.tasks {
+                    if task.is_selected {
+                        return Some(task.title.clone());
+                    }
+                }
+            },
+            AppState::Archived => {
+                if self.archive.len() > 0 {
+                    for task in &self.archive[self.curr_archive].tasks {
+                        if task.is_selected {
+                            return Some(task.title.clone());
+                        }
+                    }
+                }
+            },
+            _ => {}
+        }
+
+        None
+    }
+
+    fn get_sel_task_title_editable(&mut self) -> Option<String> {
+        match self.state {
             AppState::EditTask => {
                 for task in &self.tasks {
                     if task.is_selected {
@@ -898,16 +947,7 @@ impl App {
                     }
                 }
             },
-            AppState::Archived => {
-                if self.archive.len() > 0 {
-                    for task in &self.archive[self.curr_archive].tasks {
-                        if task.is_selected {
-                            return Some(task.title.clone());
-                        }
-                    }
-                }
-            },
-            _ => {}
+            _ => {},
         }
 
         None
@@ -1238,6 +1278,34 @@ fn create_chunks<B: Backend>(f: &mut Frame<B>) -> Vec<Rect> {
 }
 
 
+// Pop up layout
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Percentage((100 - percent_y) / 2),
+                Constraint::Percentage(percent_y),
+                Constraint::Percentage((100 - percent_y) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage((100 - percent_x) / 2),
+                Constraint::Percentage(percent_x),
+                Constraint::Percentage((100 - percent_x) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(popup_layout[1])[1]
+}
+
+
 // Render menu
 fn render_menu<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &App) {
     let menu_titles = vec!["Active tasks", "Archived tasks", "Settings"];
@@ -1405,6 +1473,32 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     f.render_widget(task_block, hsplit_layout[0]);
     f.render_widget(task_dur_block, hsplit_layout[1]);
     f.render_widget(task_description, vsplit_layout[1]);
+
+    // Pop up in case we are editing the task
+    if app.state == AppState::EditTask {
+        let mut edit_task_title = String::from("");
+        if let Some(title) = app.get_sel_task_title_editable() {
+            edit_task_title = title;
+            edit_task_title.insert(0, ' ');
+            edit_task_title.push(' ');
+        }
+        let edit_task_desc = app.get_sel_task_info_editable().unwrap_or_else(|| { vec![Spans::from(vec![Span::styled("", default_style)])]});
+
+        let area = centered_rect(60, 60, f.size());
+
+        let edit_box = Paragraph::new(edit_task_desc)
+            .alignment(Alignment::Left)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .style(border_style)
+                    .title(edit_task_title)
+            )
+            .wrap(Wrap { trim: false});
+
+        f.render_widget(Clear, area);
+        f.render_widget(edit_box, area);
+    }
 }
 
 
