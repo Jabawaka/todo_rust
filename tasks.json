@@ -1,14 +1,1 @@
-[
-  {
-    "title": "Beautify interface",
-    "description": "Pop up could use some work.",
-    "is_done": false,
-    "is_active": false,
-    "is_selected": true,
-    "elapsed_time": {
-      "secs": 0,
-      "nanos": 0
-    },
-    "created_on": "2023-01-05T06:54:40.863530Z"
-  }
-]
+[]

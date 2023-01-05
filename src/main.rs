@@ -236,6 +236,7 @@ struct App {
     state: AppState,
     edit_field: EditField,
     edit_setting: EditSettingField,
+    popup_title: String,
 
     // Displaying variables
     desc_width_char: u16,
@@ -315,6 +316,7 @@ impl App {
             state: AppState::Display,
             edit_field: EditField::Description,
             edit_setting: EditSettingField::Split,
+            popup_title: String::from("New task"),
 
             desc_width_char: 0,
 
@@ -980,6 +982,8 @@ impl App {
         };
         self.tasks.push(task.clone());
 
+        self.popup_title = String::from("New task");
+
         self.enter_edit(EditField::Title);
     }
 
@@ -1156,7 +1160,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Char(' ') => app.do_undo_task(),
                             KeyCode::Char('a') => app.add_task(),
                             KeyCode::Char('d') => app.del_task(),
-                            KeyCode::Char('e') => app.enter_edit(EditField::Description),
+                            KeyCode::Char('e') => {app.popup_title = String::from("Edit task"); app.enter_edit(EditField::Description)},
                             KeyCode::Tab => app.state = AppState::Archived,
                             KeyCode::BackTab => app.state = AppState::Settings,
                             _ => {}
@@ -1386,6 +1390,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     app.desc_width_char = vsplit_layout[1].width - 2;
     let default_style = app.settings.default.clone();
     let border_style = app.settings.border.clone();
+    let title_style = app.settings.title.clone();
 
     // Render tasks information
     let mut tasks: Vec<_> = app.tasks
@@ -1476,23 +1481,35 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
 
     // Pop up in case we are editing the task
     if app.state == AppState::EditTask {
+        let title = app.popup_title.clone();
+
         let mut edit_task_title = String::from("");
         if let Some(title) = app.get_sel_task_title_editable() {
             edit_task_title = title;
             edit_task_title.insert(0, ' ');
             edit_task_title.push(' ');
         }
-        let edit_task_desc = app.get_sel_task_info_editable().unwrap_or_else(|| { vec![Spans::from(vec![Span::styled("", default_style)])]});
+        let mut edit_task_desc = app.get_sel_task_info_editable().unwrap_or_else(|| { vec![Spans::from(vec![Span::styled("", default_style)])]});
 
         let area = centered_rect(60, 60, f.size());
 
-        let edit_box = Paragraph::new(edit_task_desc)
+        let mut popup_content = vec![
+            Spans::from(vec![Span::styled("", default_style)]),
+            Spans::from(vec![Span::styled("Title:", title_style)]),
+            Spans::from(vec![Span::styled("", default_style)]),
+            Spans::from(vec![Span::styled(edit_task_title, default_style)]),
+            Spans::from(vec![Span::styled("", default_style)]),
+            Spans::from(vec![Span::styled("Description:", title_style)])
+            ];
+        popup_content.append(&mut edit_task_desc);
+
+        let edit_box = Paragraph::new(popup_content)
             .alignment(Alignment::Left)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .style(border_style)
-                    .title(edit_task_title)
+                    .title(title)
             )
             .wrap(Wrap { trim: false});
 
