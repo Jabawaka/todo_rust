@@ -467,30 +467,40 @@ impl App {
     }
 
     fn enter_display(&mut self) {
+        let mut any_selected = false;
         for task in &mut self.tasks {
             if task.is_selected {
-                match self.edit_field {
-                    EditField::Title => {
-                        task.title = self.first_string.clone();
-                        if self.second_string.chars().count() > 0
-                        {
-                            task.title.push(self.blink_char);
-                            task.title.push_str(&self.second_string);
-                        }
+                any_selected = true;
 
-                        task.title.retain(|c| c != '\t');
-                    },
-                    EditField::Description => {
-                        task.description = self.first_string.clone();
-                        if self.second_string.chars().count() > 0
-                        {
-                            task.description.push(self.blink_char);
-                            task.description.push_str(&self.second_string);
+                if self.state == AppState::EditTask {
+                    match self.edit_field {
+                        EditField::Title => {
+                            task.title = self.first_string.clone();
+                            if self.second_string.chars().count() > 0
+                            {
+                                task.title.push(self.blink_char);
+                                task.title.push_str(&self.second_string);
+                            }
+
+                            task.title.retain(|c| c != '\t');
+                        },
+                        EditField::Description => {
+                            task.description = self.first_string.clone();
+                            if self.second_string.chars().count() > 0
+                            {
+                                task.description.push(self.blink_char);
+                                task.description.push_str(&self.second_string);
+                            }
                         }
                     }
                 }
-                self.state = AppState::Display;
             }
+        }
+
+        self.state = AppState::Display;
+
+        if !any_selected && self.tasks.len() > 0 {
+            self.tasks[0].is_selected = true;
         }
     }
 
@@ -1204,7 +1214,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Down => app.inc_sel_task(),
                             KeyCode::Up => app.dec_sel_task(),
                             KeyCode::Tab => app.state = AppState::Settings,
-                            KeyCode::BackTab => app.state = AppState::Display,
+                            KeyCode::BackTab => app.enter_display(),
                             _ => {}
                         }
                     },
@@ -1224,7 +1234,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Right => app.inc_setting(),
                             KeyCode::Left => app.dec_setting(),
                             KeyCode::Tab => app.state = AppState::Display,
-                            KeyCode::BackTab => app.state = AppState::Archived,
+                            KeyCode::BackTab => app.enter_display(),
                             _ => {}
                         }
                     },
