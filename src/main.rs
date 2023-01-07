@@ -1496,8 +1496,6 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
         let mut edit_task_title = String::from("");
         if let Some(title) = app.get_sel_task_title_editable() {
             edit_task_title = title;
-            edit_task_title.insert(0, ' ');
-            edit_task_title.push(' ');
         }
         let mut edit_task_desc = app.get_sel_task_info_editable().unwrap_or_else(|| { vec![Spans::from(vec![Span::styled("", default_style)])]});
 
