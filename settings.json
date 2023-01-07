@@ -51,7 +51,7 @@
     }
   },
   "border": {
-    "fg": "DarkGray",
+    "fg": "Cyan",
     "bg": "Black",
     "add_modifier": {
       "bits": 0
@@ -66,5 +66,5 @@
   "select_bg_colour": "Blue",
   "active_fg_colour": "White",
   "title_fg_colour": "Cyan",
-  "border_colour": "DarkGray"
+  "border_colour": "Cyan"
 }
