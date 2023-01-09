@@ -179,5 +179,22 @@
         "created_on": "2023-01-05T06:54:40.863530Z"
       }
     ]
+  },
+  {
+    "date": "2023-01-09T06:59:08.217996Z",
+    "tasks": [
+      {
+        "title": "Pop up for archiving tasks",
+        "description": "Ask confirmation to archive tasks since this is quite a big step.",
+        "is_done": true,
+        "is_active": false,
+        "is_selected": true,
+        "elapsed_time": {
+          "secs": 1588,
+          "nanos": 503308585
+        },
+        "created_on": "2023-01-08T10:29:08.106288Z"
+      }
+    ]
   }
 ]

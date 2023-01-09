@@ -56,6 +56,13 @@ enum EditSettingField {
     Border,
 }
 
+#[derive(PartialEq)]
+enum PopupType {
+    NewTask,
+    EditTask,
+    ArchiveTasks,
+}
+
 impl From<AppState> for usize {
     fn from(input: AppState) -> usize {
         match input {
@@ -236,7 +243,8 @@ struct App {
     state: AppState,
     edit_field: EditField,
     edit_setting: EditSettingField,
-    popup_title: String,
+    show_popup: bool,
+    popup_type: PopupType,
 
     // Displaying variables
     desc_width_char: u16,
@@ -316,7 +324,8 @@ impl App {
             state: AppState::Display,
             edit_field: EditField::Description,
             edit_setting: EditSettingField::Split,
-            popup_title: String::from("New task"),
+            show_popup: false,
+            popup_type: PopupType::NewTask,
 
             desc_width_char: 0,
 
@@ -468,6 +477,7 @@ impl App {
 
     fn enter_display(&mut self) {
         let mut any_selected = false;
+        self.show_popup = false;
         for task in &mut self.tasks {
             if task.is_selected {
                 any_selected = true;
@@ -992,7 +1002,8 @@ impl App {
         };
         self.tasks.push(task.clone());
 
-        self.popup_title = String::from("New task");
+        self.show_popup = true;
+        self.popup_type = PopupType::NewTask;
 
         self.enter_edit(EditField::Title);
     }
@@ -1156,9 +1167,28 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                 match rx.recv()? {
                     Event::Input(key) => {
                         match key.code {
-                            KeyCode::Char('q') => {app.save_to_db(); app.save_settings(); return Ok(())},
-                            KeyCode::Esc => {app.save_to_db(); app.save_settings(); return Ok(())},
-                            KeyCode::Char('c') => app.archive_done_tasks(),
+                            KeyCode::Char('q') => {
+                                if app.show_popup && app.popup_type == PopupType::ArchiveTasks {
+                                    app.show_popup = false;
+                                } else {
+                                    app.save_to_db();
+                                    app.save_settings();
+                                    return Ok(())
+                                }
+                            },
+                            KeyCode::Esc => {
+                                if app.show_popup && app.popup_type == PopupType::ArchiveTasks {
+                                    app.show_popup = false;
+                                } else {
+                                    app.save_to_db();
+                                    app.save_settings();
+                                    return Ok(())
+                                }
+                            },
+                            KeyCode::Char('c') => {
+                                app.show_popup = true;
+                                app.popup_type = PopupType::ArchiveTasks;
+                            },
                             KeyCode::Char('s') => app.save_to_db(),
                             KeyCode::Char('j') => app.inc_sel_task(),
                             KeyCode::Char('k') => app.dec_sel_task(),
@@ -1166,11 +1196,22 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Char('i') => app.move_task_up(),
                             KeyCode::Down => app.inc_sel_task(),
                             KeyCode::Up => app.dec_sel_task(),
-                            KeyCode::Enter => app.activate_task(),
+                            KeyCode::Enter => {
+                                if app.show_popup && app.popup_type == PopupType::ArchiveTasks {
+                                    app.archive_done_tasks();
+                                    app.show_popup = false;
+                                } else {
+                                    app.activate_task();
+                                }
+                            },
                             KeyCode::Char(' ') => app.do_undo_task(),
                             KeyCode::Char('a') => app.add_task(),
                             KeyCode::Char('d') => app.del_task(),
-                            KeyCode::Char('e') => {app.popup_title = String::from("Edit task"); app.enter_edit(EditField::Description)},
+                            KeyCode::Char('e') => {
+                                app.show_popup = true;
+                                app.popup_type = PopupType::EditTask;
+                                app.enter_edit(EditField::Description);
+                            },
                             KeyCode::Tab => app.state = AppState::Archived,
                             KeyCode::BackTab => app.state = AppState::Settings,
                             _ => {}
@@ -1233,8 +1274,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                             KeyCode::Down => app.inc_setting_selection(),
                             KeyCode::Right => app.inc_setting(),
                             KeyCode::Left => app.dec_setting(),
-                            KeyCode::Tab => app.state = AppState::Display,
-                            KeyCode::BackTab => app.enter_display(),
+                            KeyCode::Tab => app.enter_display(),
+                            KeyCode::BackTab => app.state = AppState::Archived,
                             _ => {}
                         }
                     },
@@ -1490,29 +1531,71 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     f.render_widget(task_description, vsplit_layout[1]);
 
     // Pop up in case we are editing the task
-    if app.state == AppState::EditTask {
-        let title = app.popup_title.clone();
+    if app.show_popup {
+        let area: Rect;
+        let title: String;
+        let alignment: Alignment;
+        let mut popup_content: Vec<Spans>;
 
-        let mut edit_task_title = String::from("");
-        if let Some(title) = app.get_sel_task_title_editable() {
-            edit_task_title = title;
+        match app.popup_type {
+            PopupType::NewTask => {
+                area = centered_rect(60, 60, f.size());
+                title = String::from("New task");
+                alignment = Alignment::Left;
+
+                let mut edit_task_title = String::from("");
+                if let Some(title) = app.get_sel_task_title_editable() {
+                    edit_task_title = title;
+                }
+                let mut edit_task_desc = app.get_sel_task_info_editable().unwrap_or_else(|| { vec![Spans::from(vec![Span::styled("", default_style)])]});
+
+                popup_content = vec![
+                    Spans::from(vec![Span::styled("", default_style)]),
+                    Spans::from(vec![Span::styled("Title:", title_style)]),
+                    Spans::from(vec![Span::styled("", default_style)]),
+                    Spans::from(vec![Span::styled(edit_task_title, default_style)]),
+                    Spans::from(vec![Span::styled("", default_style)]),
+                    Spans::from(vec![Span::styled("Description:", title_style)])
+                    ];
+                popup_content.append(&mut edit_task_desc);
+            },
+            PopupType::EditTask => {
+                area = centered_rect(60, 60, f.size());
+                title = String::from("Edit task");
+                alignment = Alignment::Left;
+
+                let mut edit_task_title = String::from("");
+                if let Some(title) = app.get_sel_task_title_editable() {
+                    edit_task_title = title;
+                }
+                let mut edit_task_desc = app.get_sel_task_info_editable().unwrap_or_else(|| { vec![Spans::from(vec![Span::styled("", default_style)])]});
+
+                popup_content = vec![
+                    Spans::from(vec![Span::styled("", default_style)]),
+                    Spans::from(vec![Span::styled("Title:", title_style)]),
+                    Spans::from(vec![Span::styled("", default_style)]),
+                    Spans::from(vec![Span::styled(edit_task_title, default_style)]),
+                    Spans::from(vec![Span::styled("", default_style)]),
+                    Spans::from(vec![Span::styled("Description:", title_style)])
+                    ];
+                popup_content.append(&mut edit_task_desc);
+            },
+            PopupType::ArchiveTasks => {
+                area = centered_rect(25, 25, f.size());
+                title = String::from("Confirm archiving");
+                alignment = Alignment::Center;
+
+                popup_content = vec![
+                    Spans::from(vec![Span::styled("", default_style)]),
+                    Spans::from(vec![Span::styled("Do you want to archive done tasks?", title_style)]),
+                    Spans::from(vec![Span::styled("", default_style)]),
+                    Spans::from(vec![Span::styled("Press enter to confirm, esc to cancel", default_style)])
+                ];
+            },
         }
-        let mut edit_task_desc = app.get_sel_task_info_editable().unwrap_or_else(|| { vec![Spans::from(vec![Span::styled("", default_style)])]});
-
-        let area = centered_rect(60, 60, f.size());
-
-        let mut popup_content = vec![
-            Spans::from(vec![Span::styled("", default_style)]),
-            Spans::from(vec![Span::styled("Title:", title_style)]),
-            Spans::from(vec![Span::styled("", default_style)]),
-            Spans::from(vec![Span::styled(edit_task_title, default_style)]),
-            Spans::from(vec![Span::styled("", default_style)]),
-            Spans::from(vec![Span::styled("Description:", title_style)])
-            ];
-        popup_content.append(&mut edit_task_desc);
 
         let edit_box = Paragraph::new(popup_content)
-            .alignment(Alignment::Left)
+            .alignment(alignment)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
