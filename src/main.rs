@@ -248,6 +248,8 @@ struct App {
 
     // Displaying variables
     desc_width_char: u16,
+    task_block_height: u16,
+    first_task: u16,
 
     // Editing variables
     first_string: String,
@@ -328,6 +330,8 @@ impl App {
             popup_type: PopupType::NewTask,
 
             desc_width_char: 0,
+            task_block_height: 0,
+            first_task: 0,
 
             first_string: String::from(""),
             blink_char: '\t',
@@ -399,6 +403,10 @@ impl App {
                         if self.tasks[index].is_selected {
                             self.tasks[index].is_selected = false;
                             self.tasks[index + 1].is_selected = true;
+
+                            if (index + 1) as u16 >= self.first_task + self.task_block_height {
+                                self.first_task = (index + 1) as u16 - (self.task_block_height - 1);
+                            }
                             break;
                         }
 
@@ -413,6 +421,10 @@ impl App {
                             if self.archive[self.curr_archive].tasks[index].is_selected {
                                 self.archive[self.curr_archive].tasks[index].is_selected = false;
                                 self.archive[self.curr_archive].tasks[index + 1].is_selected = true;
+
+                                if (index + 1) as u16 >= self.first_task + self.task_block_height {
+                                    self.first_task = (index + 1) as u16 - (self.task_block_height - 1);
+                                }
                                 break;
                             }
 
@@ -434,6 +446,10 @@ impl App {
                     if self.tasks[index].is_selected {
                         self.tasks[index].is_selected = false;
                         self.tasks[index - 1].is_selected = true;
+
+                        if ((index - 1) as u16) < self.first_task {
+                            self.first_task = (index - 1) as u16;
+                        }
                     }
 
                     index += 1;
@@ -445,6 +461,10 @@ impl App {
                         if self.archive[self.curr_archive].tasks[index].is_selected {
                             self.archive[self.curr_archive].tasks[index].is_selected = false;
                             self.archive[self.curr_archive].tasks[index - 1].is_selected = true;
+
+                            if ((index - 1) as u16) < self.first_task {
+                                self.first_task = (index - 1) as u16;
+                            }
                         }
 
                         index += 1;
@@ -1432,6 +1452,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     let hsplit_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
+            Constraint::Length(4),
             Constraint::Percentage(50),
             Constraint::Percentage(50),
         ]
@@ -1439,9 +1460,33 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
 
     // Capture displaying variables
     app.desc_width_char = vsplit_layout[1].width - 2;
+    app.task_block_height = hsplit_layout[0].height - 2;
     let default_style = app.settings.default.clone();
     let border_style = app.settings.border.clone();
     let title_style = app.settings.title.clone();
+
+    // Render scroll bar
+    let mut line = 0;
+    let mut scroll_bar = vec![];
+    let mut scroll_perc = -1.0;
+    if app.tasks.len() > app.task_block_height as usize {
+        scroll_perc = (app.first_task as f32) / ((app.tasks.len() as u16 - app.task_block_height) as f32);
+        let scroll_line = (scroll_perc * (app.task_block_height - 1) as f32) as u16;
+
+        while line < app.task_block_height {
+            if line == scroll_line {
+                scroll_bar.push(Spans::from(vec![Span::styled("#", app.settings.border)]));
+            } else {
+                scroll_bar.push(Spans::from(vec![Span::styled(" ", app.settings.border)]));
+            }
+            line += 1;
+        }
+    } else {
+        while line < app.task_block_height {
+            scroll_bar.push(Spans::from(vec![Span::styled(" ", app.settings.border)]));
+            line += 1;
+        }
+    }
 
     // Render tasks information
     let mut tasks: Vec<_> = app.tasks
@@ -1470,7 +1515,11 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
         })
         .collect();
 
-    tasks.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
+    if tasks.len() > app.task_block_height as usize {
+        let first_index = app.first_task as usize;
+        let last_index = (app.first_task + app.task_block_height) as usize;
+        tasks = tasks[first_index..last_index].to_vec();
+    }
 
     let mut tasks_duration: Vec<_> = app.tasks
         .iter()
@@ -1490,13 +1539,25 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
         })
         .collect();
 
-    tasks_duration.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
+    if tasks_duration.len() > app.task_block_height as usize {
+        let first_index = app.first_task as usize;
+        let last_index = (app.first_task + app.task_block_height) as usize;
+        tasks_duration = tasks_duration[first_index..last_index].to_vec();
+    }
+
+    let scroll_block = Paragraph::new(scroll_bar)
+        .alignment(Alignment::Left)
+        .block(
+            Block::default()
+            .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
+            .style(border_style)
+        );
 
     let task_block = Paragraph::new(tasks)
         .alignment(Alignment::Left)
         .block(
             Block::default()
-            .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
+            .borders(Borders::TOP | Borders::BOTTOM)
             .style(border_style)
             .title(" To Do ")
         );
@@ -1526,11 +1587,12 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
         )
         .wrap(Wrap { trim: false });
 
-    f.render_widget(task_block, hsplit_layout[0]);
-    f.render_widget(task_dur_block, hsplit_layout[1]);
+    f.render_widget(scroll_block, hsplit_layout[0]);
+    f.render_widget(task_block, hsplit_layout[1]);
+    f.render_widget(task_dur_block, hsplit_layout[2]);
     f.render_widget(task_description, vsplit_layout[1]);
 
-    // Pop up in case we are editing the task
+    // Show whatever popup is needed
     if app.show_popup {
         let area: Rect;
         let title: String;
@@ -1610,7 +1672,7 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
 }
 
 
-// Render tasks screen
+// Render archived screen
 fn render_archived<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     let vsplit_layout = if app.settings.is_horizontal {
         Layout::default()
@@ -1635,6 +1697,7 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     let hsplit_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
+            Constraint::Length(4),
             Constraint::Percentage(50),
             Constraint::Percentage(50),
         ]
@@ -1697,7 +1760,6 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
                 Spans::from(vec![Span::styled(disp_string, style)])
             })
             .collect();
-        archive_tasks.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
 
         archive_durations = archive_item.tasks
             .iter()
@@ -1716,14 +1778,46 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
                 Spans::from(vec![Span::styled(task.get_time_str(), style)])
             })
             .collect();
-        archive_durations.insert(0, Spans::from(vec![Span::styled(String::from(""), default_style)]));
+    }
+
+    // Render scroll bar
+    let mut scroll_bar = vec![];
+    if app.archive.len() > 0 {
+        let mut line = 0;
+        let mut scroll_perc = -1.0;
+        if app.archive[app.curr_archive].tasks.len() > app.task_block_height as usize {
+            scroll_perc = (app.first_task as f32) / ((app.archive[app.curr_archive].tasks.len() as u16 - app.task_block_height) as f32);
+            let scroll_line = (scroll_perc * (app.task_block_height - 1) as f32) as u16;
+
+            while line < app.task_block_height {
+                if line == scroll_line {
+                    scroll_bar.push(Spans::from(vec![Span::styled("#", app.settings.border)]));
+                } else {
+                    scroll_bar.push(Spans::from(vec![Span::styled(" ", app.settings.border)]));
+                }
+                line += 1;
+            }
+        } else {
+            while line < app.task_block_height {
+                scroll_bar.push(Spans::from(vec![Span::styled(" ", app.settings.border)]));
+                line += 1;
+            }
+        }
+
+
+        if app.archive[app.curr_archive].tasks.len() > app.task_block_height as usize {
+            let first_index = app.first_task as usize;
+            let last_index = (app.first_task + app.task_block_height) as usize;
+            archive_tasks = archive_tasks[first_index..last_index].to_vec();
+            archive_durations = archive_durations[first_index..last_index].to_vec();
+        }
     }
 
     let archive_block = Paragraph::new(archive_tasks)
         .alignment(Alignment::Left)
         .block(
             Block::default()
-            .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
+            .borders(Borders::TOP | Borders::BOTTOM)
             .style(border_style)
             .title(archive_title)
         );
@@ -1733,6 +1827,14 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
         .block(
             Block::default()
             .borders(Borders::RIGHT | Borders::TOP | Borders::BOTTOM)
+            .style(border_style)
+        );
+
+    let scroll_block = Paragraph::new(scroll_bar)
+        .alignment(Alignment::Left)
+        .block(
+            Block::default()
+            .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
             .style(border_style)
         );
 
@@ -1750,8 +1852,9 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
         )
         .wrap(Wrap { trim: false });
 
-    f.render_widget(archive_block, hsplit_layout[0]);
-    f.render_widget(archive_dur_block, hsplit_layout[1]);
+    f.render_widget(scroll_block, hsplit_layout[0]);
+    f.render_widget(archive_block, hsplit_layout[1]);
+    f.render_widget(archive_dur_block, hsplit_layout[2]);
     f.render_widget(task_description, vsplit_layout[1]);
 }
 
