@@ -1468,16 +1468,17 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     // Render scroll bar
     let mut line = 0;
     let mut scroll_bar = vec![];
-    let mut scroll_perc = -1.0;
+    let scroll_perc;
     if app.tasks.len() > app.task_block_height as usize {
         scroll_perc = (app.first_task as f32) / ((app.tasks.len() as u16 - app.task_block_height) as f32);
         let scroll_line = (scroll_perc * (app.task_block_height - 1) as f32) as u16;
+        let scroll_size = (((app.task_block_height as f32) * (app.task_block_height as f32) / (app.tasks.len() as f32)).floor()) as u16;
 
         while line < app.task_block_height {
-            if line == scroll_line {
-                scroll_bar.push(Spans::from(vec![Span::styled("#", app.settings.border)]));
+            if line >= scroll_line && line <= (scroll_line + scroll_size) {
+                scroll_bar.push(Spans::from(vec![Span::styled("█", app.settings.border)]));
             } else {
-                scroll_bar.push(Spans::from(vec![Span::styled(" ", app.settings.border)]));
+                scroll_bar.push(Spans::from(vec![Span::styled("│", app.settings.border)]));
             }
             line += 1;
         }
@@ -1784,16 +1785,16 @@ fn render_archived<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     let mut scroll_bar = vec![];
     if app.archive.len() > 0 {
         let mut line = 0;
-        let mut scroll_perc = -1.0;
+        let scroll_perc;
         if app.archive[app.curr_archive].tasks.len() > app.task_block_height as usize {
             scroll_perc = (app.first_task as f32) / ((app.archive[app.curr_archive].tasks.len() as u16 - app.task_block_height) as f32);
             let scroll_line = (scroll_perc * (app.task_block_height - 1) as f32) as u16;
 
             while line < app.task_block_height {
                 if line == scroll_line {
-                    scroll_bar.push(Spans::from(vec![Span::styled("#", app.settings.border)]));
+                    scroll_bar.push(Spans::from(vec![Span::styled("█", app.settings.border)]));
                 } else {
-                    scroll_bar.push(Spans::from(vec![Span::styled(" ", app.settings.border)]));
+                    scroll_bar.push(Spans::from(vec![Span::styled("│", app.settings.border)]));
                 }
                 line += 1;
             }

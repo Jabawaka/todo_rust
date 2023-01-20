@@ -1,17 +1,5 @@
 [
   {
-    "title": "Scrollable tasks",
-    "description": "Turns out than on my dev computers the screen real state is biiiiiig. But on other screens we can only get so much on it, so scrollable tasks is a must.",
-    "is_done": false,
-    "is_active": true,
-    "is_selected": true,
-    "elapsed_time": {
-      "secs": 2196,
-      "nanos": 923479308
-    },
-    "created_on": "2023-01-08T10:29:44.803707Z"
-  },
-  {
     "title": "Test 1",
     "description": "",
     "is_done": false,
@@ -64,7 +52,7 @@
     "description": "",
     "is_done": false,
     "is_active": false,
-    "is_selected": false,
+    "is_selected": true,
     "elapsed_time": {
       "secs": 0,
       "nanos": 0
