@@ -1,5 +1,6 @@
 mod app;
 
+use crate::app::App;
 
 use std::env;
 use std::io;
@@ -14,8 +15,6 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-
-use crate::app::App;
 
 // ---- MAIN FUNCTION ----
 fn main() -> Result<(), Box<dyn std::error::Error>> {

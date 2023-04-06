@@ -4,7 +4,7 @@
     "description": "",
     "is_done": false,
     "is_active": false,
-    "is_selected": true,
+    "is_selected": false,
     "elapsed_time": {
       "secs": 0,
       "nanos": 0
@@ -40,7 +40,7 @@
     "description": "",
     "is_done": false,
     "is_active": false,
-    "is_selected": false,
+    "is_selected": true,
     "elapsed_time": {
       "secs": 0,
       "nanos": 0

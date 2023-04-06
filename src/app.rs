@@ -4,12 +4,13 @@
 // the app.
 // ----------------------------------------------------------------------------
 
-pub mod utils;
-mod logic;
+mod utils;
+mod task;
 mod renderer;
 
 use utils::*;
 use renderer::*;
+use task::Task;
 
 use std::io::Write;
 use std::{fs, fs::File};
@@ -85,47 +86,6 @@ enum EditSettingField {
 enum EditField {
     Title,
     Description,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct Task {
-    title: String,
-    description: String,
-    is_done: bool,
-    is_active: bool,
-    is_selected: bool,
-    elapsed_time: Duration,
-    created_on: DateTime<Utc>,
-}
-
-impl Task {
-    fn get_time_str(&self) -> String {
-        let mut time_str = String::from("");
-
-        if self.elapsed_time.as_secs() < 60 {
-            time_str.push_str("< 1 min");
-        } else {
-            let hours: u64 = (self.elapsed_time.as_secs() as f64 / 3600.0).floor() as u64;
-            let mins: u64 = ((self.elapsed_time.as_secs() - hours * 3600) as f64 / 60.0).round() as u64;
-            if hours > 0 {
-                time_str.push_str(&hours.to_string());
-                time_str.push_str(" h");
-            }
-            time_str.push_str(" ");
-            time_str.push_str(&mins.to_string());
-            time_str.push_str(" min");
-        }
-
-        time_str
-    }
-
-    fn toggle_active(&mut self) {
-        if self.is_active {
-            self.is_active = false;
-        } else {
-            self.is_active = true;
-        }
-    }
 }
 
 
