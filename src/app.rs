@@ -114,12 +114,12 @@ struct Settings {
 
 impl Settings {
     fn set_colours(&mut self) {
-        self.default = Style::default().fg(self.normal_fg_colour).bg(self.normal_bg_colour);
-        self.highlight = Style::default().fg(self.select_fg_colour).bg(self.select_bg_colour);
-        self.active_normal = Style::default().fg(self.active_fg_colour).bg(self.normal_bg_colour);
+        self.default          = Style::default().fg(self.normal_fg_colour).bg(self.normal_bg_colour);
+        self.highlight        = Style::default().fg(self.select_fg_colour).bg(self.select_bg_colour);
+        self.active_normal    = Style::default().fg(self.active_fg_colour).bg(self.normal_bg_colour);
         self.active_highlight = Style::default().fg(self.active_fg_colour).bg(self.select_bg_colour);
-        self.title = Style::default().fg(self.title_fg_colour).bg(self.normal_bg_colour);
-        self.border = Style::default().fg(self.border_colour).bg(self.normal_bg_colour);
+        self.title            = Style::default().fg(self.title_fg_colour).bg(self.normal_bg_colour);
+        self.border           = Style::default().fg(self.border_colour).bg(self.normal_bg_colour);
     }
 
     pub fn default_settings() -> Settings {
