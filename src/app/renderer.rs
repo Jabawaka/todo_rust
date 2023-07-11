@@ -173,14 +173,18 @@ fn render_tasks<B: Backend>(f: &mut Frame<B>, rect: &Rect, app: &mut App) {
     // Render scroll bar
     let mut line = 0;
     let mut scroll_bar = vec![];
-    let scroll_perc;
+    let mut scroll_perc = 0.0;
+    let mut scroll_line = 0;
+    let mut scroll_size = 0;
     if app.tasks.len() > app.task_block_height as usize {
-        scroll_perc = (app.first_task as f32) / ((app.tasks.len() as u16 - app.task_block_height) as f32);
-        let scroll_line = (scroll_perc * (app.task_block_height - 1) as f32) as u16;
-        let scroll_size = (((app.task_block_height as f32) * (app.task_block_height as f32) / (app.tasks.len() as f32)).floor()) as u16;
+        scroll_size = ((app.task_block_height as f32 / app.tasks.len() as f32) * (app.task_block_height) as f32).floor() as u16;
 
+        scroll_perc = (app.first_task as f32) / ((app.tasks.len() as u16 - app.task_block_height) as f32);
+        scroll_line = (scroll_perc * ((app.task_block_height - scroll_size) as f32)) as u16;
+
+        // Write out the scroll bar
         while line < app.task_block_height {
-            if line >= scroll_line && line <= (scroll_line + scroll_size) {
+            if line >= scroll_line && line < (scroll_line + scroll_size) {
                 scroll_bar.push(Spans::from(vec![Span::styled("█", app.settings.border)]));
             } else {
                 scroll_bar.push(Spans::from(vec![Span::styled("│", app.settings.border)]));
